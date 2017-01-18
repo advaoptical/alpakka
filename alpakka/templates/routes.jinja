@@ -1,0 +1,45 @@
+package {{ ctx.package }};
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import akka.http.javadsl.marshallers.jackson.Jackson;
+import akka.http.javadsl.server.AllDirectives;
+import akka.http.javadsl.server.Route;
+{% for import in ctx.imports -%}
+import {{ import }};
+{%- endfor %}
+public class {{ name }} extends AllDirectives {
+
+  private {{ ctx.interface_name }} backend;
+
+  public {{ name }} ({{ ctx.interface_name }} backend){
+    this.backend = backend;
+  }
+{% for name, rpc in ctx.rpcs.items() %}
+  {%- if rpc.input and rpc.input.vars %}
+  public static class Rpc{{ name | firstupper }} {
+    {%- for name, input in rpc.input.vars.items() %}
+    @JsonProperty("{{ input.name }}")
+    public {{ input.java_type }} {{ name }};
+    {%- endfor %}
+  }
+  {%- endif %}
+
+  private Route {{ name }}() {
+    return path("{{ name }}", () ->
+    {%- if rpc.input and rpc.input.vars.items() %} entity(Jackson.unmarshaller(Rpc{{ name | firstupper }}.class),
+      jsonContent ->{% endif %} backend.{{ name }}(
+        {%- if rpc.input and rpc.input.vars %}{%- for name, input in rpc.input.vars.items() -%}
+        jsonContent.{{ name }}{% if not loop.last %}, {% endif %}
+        {%- endfor -%}{% endif %})){%- if rpc.input and rpc.input.vars %}){% endif %};
+  }
+{% endfor %}
+  public Route getRpcRoutes() {
+    return post(()-> route(
+        {%- for name in ctx.rpcs.keys() -%}
+            {{ name }}(){% if not loop.last %},
+            {% endif %}
+        {%- endfor %}));
+  }
+
+}

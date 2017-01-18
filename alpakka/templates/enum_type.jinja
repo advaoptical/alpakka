@@ -1,0 +1,42 @@
+{%- from 'fub.jinja' import class_description -%}
+package {{ ctx.package() }};
+
+{% if ctx.type.has_javanames -%}
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
+{% endif -%}
+{{ class_description(ctx.description) }}
+public enum {{ name }} {
+  {% for key, value in ctx.type.enums.items() %}
+    {%- if value.javaname %}{{ value.javaname }}("{{ key }}")
+    {%- else %}{{ key }}
+    {%- endif %}{% if not loop.last %}, {% endif %}
+  {%- endfor %}
+  {%- if ctx.type.has_javanames %};
+
+  private final String jsonName;
+
+  private {{ name }}(){
+      this.jsonName = this.name();
+  }
+
+  private {{ name }}(String jsonName) {
+    this.jsonName = jsonName;
+  }
+
+  @JsonCreator
+  public static {{ name }} fromJsonString(String jsonString) {
+    for ({{ name }} value : {{ name }}.values())
+      if (value.jsonName.equals(jsonString)) {
+        return value;
+      }
+    return null;
+  }
+
+  @JsonValue
+  public String toJsonString() {
+    return this.jsonName;
+  }
+{% endif %}
+}

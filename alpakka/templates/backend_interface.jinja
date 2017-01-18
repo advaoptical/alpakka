@@ -1,0 +1,15 @@
+package {{ ctx.package }};
+
+import akka.http.javadsl.server.Route;
+{% for import in ctx.imports -%}
+import {{ import }};
+{%- endfor %}
+public interface {{ name }} {
+{% for key, rpc in ctx.rpcs.items() %}
+  public Route {{ key }}(
+    {%- if rpc.input %}{% for name, input in rpc.input.vars.items() -%}
+    {{ input.java_type }} {{ name }}{% if not loop.last %}, {% endif %}
+    {%- endfor %}{% endif -%}
+    );
+{% endfor %}
+}

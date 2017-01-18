@@ -1,0 +1,7 @@
+{%- macro class_description(description=None) -%}
+{% if description -%}
+/**
+ * {{ description|replace('\n', "\n* " )|indent(1) }}
+ */
+{%- endif %}
+{%- endmacro -%}

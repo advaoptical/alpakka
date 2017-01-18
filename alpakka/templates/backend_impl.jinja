@@ -1,0 +1,28 @@
+package {{ ctx.package }};
+
+import akka.http.javadsl.server.Directives;
+import akka.http.javadsl.server.Route;
+{% for import in ctx.imports -%}
+import {{ import }};
+{%- endfor %}
+public class {{ name }} implements {{ ctx.interface_name }}{
+
+  public {{ name }}() {}
+{% for key, rpc in ctx.rpcs.items() %}
+  public Route {{ key }}(
+    {%- if rpc.input %}{% for name, input in rpc.input.vars.items() -%}
+    {{ input.java_type }} {{ name }}{% if not loop.last %}, {% endif %}
+    {%- endfor %}{% endif -%}
+    ) {
+    String msg = String.format("You have called: {{ key }}
+    {%- if rpc.input %} with {% for name, input in rpc.input.vars.items() -%}
+        %s{% if not loop.last %}, {% endif %}
+        {%- endfor -%}
+    {%- endif -%}"
+    {%- if rpc.input %}{% for name, input in rpc.input.vars.items() -%}
+        , {{ name }}{%- endfor -%}
+    {%- endif -%});
+    return Directives.complete(msg);
+  }
+{% endfor %}
+}

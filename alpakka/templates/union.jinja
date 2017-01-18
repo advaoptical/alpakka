@@ -1,0 +1,27 @@
+{%- from 'fub.jinja' import class_description -%}
+package {{ ctx.package() }};
+
+import java.io.Serializable;
+import java.util.Objects;
+
+{{ class_description(ctx.description) }}
+public class {{ name }} implements Serializable {
+
+  private static final long serialVersionUID = 1L;
+{% for key, var in ctx.type.types.items() %}
+{% if var.description %}  /** {{ var.description }} */{% endif %}
+  private {{ var.java_type }} {{ key }};
+{% endfor %}
+
+{%- for key, var in ctx.type.types.items() %}
+  public {{ name }} ({{ var.java_type }} {{ key }}){
+    this.{{ key }} = {{ key }};
+  }
+{% endfor %}
+
+{%- for key, var in ctx.type.types.items() %}
+  public {{ var.java_type }} get{{ var.java_type }}(){
+    return {{ key }};
+  }
+{% endfor %}
+}
