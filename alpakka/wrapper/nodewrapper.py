@@ -1,10 +1,13 @@
 import re
 from collections import OrderedDict
 
+# Java type used to instantiate lists
 JAVA_LIST_INSTANCE = {'com.google.common.collect.ImmutableList'}
 
+# Java imports for using lists in an interface
 JAVA_LIST_IMPORTS = {'java.util.List'}
 
+# regular expressions mapping yang types to Java types
 TYPE_PATTERNS_TO_JAVA = [
     (r"u?int\d*", "int"),
     (r"string", "String"),
@@ -12,6 +15,7 @@ TYPE_PATTERNS_TO_JAVA = [
     (r"decimal64", "double"),
 ]
 
+# Java wrapper classes for base types (needed for hashCode)
 JAVA_WRAPPER_CLASSES = {
     "int": "Integer",
     "boolean": "Boolean",
@@ -33,12 +37,25 @@ def type_to_java(yang):
 
 
 def java_class_name(name):
+    """
+    Cleanup for names that need to follow Java class name restrictions.
+    Add any further processing here.
+    :param name: the name to be cleaned up
+    :return: class name following Java convention
+    """
     class_name = name.capitalize()
     class_name = class_name.replace("-", " ").title()
     return class_name.replace(" ", "")
 
 
 def to_camelcase(string):
+    """
+    Creates a camel case representation by removing hyphens.
+    The first letter is lower case everything else remains untouched.
+    Example: Hello-world -> helloWorld
+    :param string: string to be processed
+    :return: camel case representation of the string
+    """
     string = string[0].lower() + string[1:]
     return re.sub(r'[-](?P<first>[a-z])',
                   lambda m: m.group('first').upper(), string)
@@ -49,7 +66,7 @@ class NodeWrapper:
     Base class for node wrappers. It includes the base setup.
     """
 
-    def __init__(self, statement, parent=None):
+    def __init__(self, statement, parent):
         self.statement = statement
         self.parent = parent
         for stmt in statement.substmts:
@@ -77,6 +94,16 @@ class NodeWrapper:
             return self.statement.top.i_prefix.lower().replace("-", "/")
         else:
             return self.statement.i_prefix.lower().replace("-", "/")
+
+    def top(self):
+        """
+        Find the root wrapper object by walking the tree to the top.
+        :return: the root node
+        """
+        if self.parent:
+            return self.parent.top()
+        else:
+            return self
 
 
 class Module(NodeWrapper):
