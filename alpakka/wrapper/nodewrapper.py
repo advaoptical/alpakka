@@ -97,6 +97,13 @@ class NodeWrapper:
             elif stmt.keyword == 'config':
                 self.config = statement.arg.lower() == 'true'
 
+    def name(self):
+        """
+        Shortcut for accessing the statement's argument
+        :return: name of the YANG node
+        """
+        return self.statement.arg
+
     def package(self):
         """
         The pakackage name of this module.
@@ -135,12 +142,6 @@ class Module(NodeWrapper):
         # call the super constructor
         super().__init__(statement, parent)
         self.java_name = java_class_name(statement.i_prefix)
-        # go through available substatements
-        #         self.typedefs[typedef.java_type] = typedef
-
-        #         self.rpcs[rpc.java_name] = rpc
-
-        #         self.classes[grouping.java_type] = grouping
 
     def enums(self):
         """
@@ -327,13 +328,6 @@ class Leaf(Typonder):
         :return:
         """
         return self.java_imports
-    #
-    # def interface_imports(self):
-    #     """
-    #     Set of imports that are needed if the interface is used.
-    #     :return: set of imports
-    #     """
-    #     return set()
 
 
 class LeafRef(NodeWrapper):
@@ -516,7 +510,7 @@ class Grouping(Grouponder):
         Collects all the imports that are needed for the grouping.
         :return: set of imports
         """
-        # the imports from parent class
+        # TODO: the imports from parent class
         # extends = {'%s.%s' % (inherit.package(), name) for name, inherit in self.inherits.items()}
         # imports for own children
         imports = set()
@@ -542,13 +536,6 @@ class Container(Grouping):
 
     def member_imports(self):
         return self.java_import
-
-    # def interface_imports(self):
-    #     """
-    #     Imports needed for an interface access.
-    #     :return: interface imports
-    #     """
-    #     return self.java_import
 
 
 class List(Grouping):
@@ -582,7 +569,6 @@ class List(Grouping):
         imports |= JAVA_LIST_INSTANCE_IMPORTS
         # TODO: list type import
         return imports
-
 
     # def imports(self):
     #     return JAVA_LIST_INSTANCE | self.interface_imports()

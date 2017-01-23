@@ -109,6 +109,8 @@ class AkkaPlugin(plugin.PyangPlugin):
         self.fill_template('grouping.jinja', module.classes)
         # generate unions
         self.fill_template('union.jinja', module.unions())
+        # generate routes for the data tree
+        self.fill_template('tree.jinja', {'mymodule': module})
         # run only if rpcs are available
         if module.rpcs:
             if_name = '%sInterface' % module.java_name
