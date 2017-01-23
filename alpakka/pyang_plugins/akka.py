@@ -76,9 +76,15 @@ class AkkaPlugin(plugin.PyangPlugin):
     def emit(self, ctx, modules, writef):
         self.get_options(ctx)
         for module in modules:
-            # wrap module statement
-            wrapped_module = wrap_module(module)
-            self.generate_classes(wrapped_module)
+            for module_details, context_module in module.i_ctx.modules.items():
+                if context_module.i_children:
+                    logging.info("Wrapping module %s (%s)", module_details[0], module_details[1])
+                    # wrap module statement
+                    wrapped_module = wrap_module(context_module)
+                    self.generate_classes(wrapped_module)
+                else:
+                    logging.info("No children in module %s (%s)", module_details[0],
+                                 module_details[1])
 
     def get_options(self, ctx):
         """

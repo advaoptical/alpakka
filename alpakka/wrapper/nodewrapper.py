@@ -315,11 +315,11 @@ class Leaf(Typonder):
         self.java_imports = set()
         self.java_type = self.type.java_type
         # if the package of the type differs from the lesf's type
-        if self.package() != self.type.package():
+        if self.yang_module != self.type.yang_module:
             self.java_imports.add('%s.%s' % (self.type.package(), self.type.java_type))
         # if the type already has imports
-        # if hasattr(self.type, 'java_imports'):
-        #     self.java_imports |= self.type.java_imports
+        if hasattr(self.type, "member_imports"):
+            self.java_imports |= self.type.member_imports()
 
     def member_imports(self):
         """
@@ -343,6 +343,7 @@ class LeafRef(NodeWrapper):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
+        self.java_imports = set()
         type_spec = statement.i_type_spec
         # the target might not be defined for unused groupings
         if hasattr(type_spec, 'i_target_node'):
@@ -350,8 +351,11 @@ class LeafRef(NodeWrapper):
             self.reference = Leaf(type_spec.i_target_node, self)
             self.java_type = self.reference.java_type
             # if the package of the node differs from the referenced type
-            if self.package() != self.reference.package():
-                self.java_imports = {'%s.%s' % (self.reference.package(), self.java_type)}
+            if self.yang_module != self.reference.yang_module:
+                self.java_imports.add('%s.%s' % (self.reference.package(), self.java_type))
+
+    def member_imports(self):
+        return self.java_imports
 
 
 class LeafList(Typonder):
