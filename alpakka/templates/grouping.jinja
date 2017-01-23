@@ -7,20 +7,21 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
-{% if ctx.inherits or ctx.vars -%}
-  import com.fasterxml.jackson.annotation.JsonProperty;
+{%- if ctx.inherits or ctx.vars %}
+import com.fasterxml.jackson.annotation.JsonProperty;
 {%- endif %}
-
+{% if ctx.imports() %}
 {% for import in ctx.imports()|sort -%}
 import {{ import }};
 {% endfor %}
+{%- endif %}
 {{ class_description(ctx.description) }}
 @JsonInclude(Include.NON_NULL)
 public class {{ name }} {% if ctx.inherits %}extends {{ ctx.inherits.keys() | first }} {% endif %}implements Serializable {
 
   private static final long serialVersionUID = 1L;
 {% for key, var in ctx.vars.items() %}
-{% if var.description %}  /** {{ var.description }} */{% endif %}
+{{ class_description(var.description) | indent(2, True) }}
   private final {{ var.java_type }} {{ key }};
 {% endfor %}
 
