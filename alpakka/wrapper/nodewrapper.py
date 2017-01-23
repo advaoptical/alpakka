@@ -345,16 +345,19 @@ class LeafRef(NodeWrapper):
         super().__init__(statement, parent)
         self.java_imports = set()
         type_spec = statement.i_type_spec
-        # the target might not be defined for unused groupings
+        # The target is defined in the module tree but might not be for unused groupings.
         if hasattr(type_spec, 'i_target_node'):
             self.group = 'ref'
             self.reference = Leaf(type_spec.i_target_node, self)
             self.java_type = self.reference.java_type
-            # if the package of the node differs from the referenced type
+            # if the referenced type is in another module, add the import
             if self.yang_module != self.reference.yang_module:
                 self.java_imports.add('%s.%s' % (self.reference.package(), self.java_type))
 
     def member_imports(self):
+        """
+        :return: a set of imports needed for the leaf reference
+        """
         return self.java_imports
 
 
