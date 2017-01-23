@@ -318,8 +318,8 @@ class Leaf(Typonder):
         if self.package() != self.type.package():
             self.java_imports.add('%s.%s' % (self.type.package(), self.type.java_type))
         # if the type already has imports
-        if hasattr(self.type, 'java_imports'):
-            self.java_imports |= self.type.java_imports
+        # if hasattr(self.type, 'java_imports'):
+        #     self.java_imports |= self.type.java_imports
 
     def member_imports(self):
         """
