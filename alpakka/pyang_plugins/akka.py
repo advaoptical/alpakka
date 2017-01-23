@@ -1,3 +1,4 @@
+import logging
 import optparse
 import os
 
@@ -92,15 +93,16 @@ class AkkaPlugin(plugin.PyangPlugin):
             self.output_path = ctx.opts.akka_output
 
     def generate_classes(self, module):
-        full_path = "%s/%s" % (self.output_path, module.subpath())
         # generate enum classes
-        self.fill_template('enum_type.jinja', module.enums(), full_path)
+        self.fill_template('enum_type.jinja', module.enums())
+        # generate class extensions
+        self.fill_template('class_extension.jinja', module.types())
         # generate base class extensions
-        self.fill_template('class_type.jinja', module.base_extensions(), full_path)
+        self.fill_template('class_type.jinja', module.base_extensions())
         # generate classes
-        self.fill_template('grouping.jinja', module.classes, full_path)
+        self.fill_template('grouping.jinja', module.classes)
         # generate unions
-        self.fill_template('union.jinja', module.unions(), full_path)
+        self.fill_template('union.jinja', module.unions())
         # run only if rpcs are available
         if module.rpcs:
             if_name = '%sInterface' % module.java_name
@@ -108,20 +110,29 @@ class AkkaPlugin(plugin.PyangPlugin):
                            if hasattr(rpc, 'imports')
                            for imp in rpc.imports()}
             rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports, 'package': module.package()}
-            self.fill_template('backend_interface.jinja', {if_name: rpc_dict}, full_path)
+            self.fill_template('backend_interface.jinja', {if_name: rpc_dict})
             rpc_dict['interface_name'] = if_name
             self.fill_template('backend_impl.jinja',
-                               {'%sBackend' % module.java_name: rpc_dict},
-                               full_path)
-            self.fill_template('routes.jinja', {'%sRoutes' % module.java_name: rpc_dict},
-                               full_path)
+                               {'%sBackend' % module.java_name: rpc_dict})
+            self.fill_template('routes.jinja', {'%sRoutes' % module.java_name: rpc_dict})
 
-    def fill_template(self, template_name, description_dict, output_path):
+    def fill_template(self, template_name, description_dict):
+        """
+        Fills the template with the descriptions given in the dictionary.
+        :param template_name: the template to be used
+        :param description_dict: the dictionary with descriptions
+        """
         template = self.env.get_template(template_name)
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
         for key, context in description_dict.items():
+            # get the output path for the file
+            output_path = "%s/%s" % (self.output_path, context.subpath())
+            # create folder if not available
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            # render the template
             output = template.render(ctx=context, name=key)
-            print(output)
+            # print the output for debugging
+            logging.debug(output)
+            # write to file
             with open("%s/%s.java" % (output_path, key), 'w') as f:
                 f.write(output)

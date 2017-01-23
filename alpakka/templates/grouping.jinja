@@ -7,7 +7,9 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.annotation.JsonProperty;
+{% if ctx.inherits or ctx.vars -%}
+  import com.fasterxml.jackson.annotation.JsonProperty;
+{%- endif %}
 
 {% for import in ctx.imports()|sort -%}
 import {{ import }};
@@ -70,6 +72,7 @@ public class {{ name }} {% if ctx.inherits %}extends {{ ctx.inherits.keys() | fi
     {%- if ctx.vars %}
     {{ name }} that = ({{ name }}) o;
     {%- endif %}
+    {%- if ctx.inherits or ctx.vars %}
     return
       {%- if ctx.inherits %} super.equals(o) {%- if ctx.vars %} &&
       {% endif %}{%- endif %}
@@ -77,6 +80,9 @@ public class {{ name }} {% if ctx.inherits %}extends {{ ctx.inherits.keys() | fi
       {%- if not loop.last %} &&
       {% endif %}
     {%- endfor %};
+    {%- else %}
+    return true;
+    {%- endif %}
   }
 
 }
