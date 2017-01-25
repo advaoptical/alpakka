@@ -2,7 +2,7 @@
 package {{ ctx.package() }};
 
 import java.io.Serializable;
-{% for import in ctx.java_imports %}
+{% for import in ctx.java_imports.get_imports() %}
 import {{ import }};
 {%- endfor %}
 

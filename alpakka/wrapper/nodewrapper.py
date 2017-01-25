@@ -3,16 +3,16 @@ import re
 from collections import OrderedDict
 
 # configuration for logging
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
 # appendix indicating a list type class
 JAVA_LIST_CLASS_APPENDIX = 'ListType'
 
 # Java imports for using lists in an interface
-JAVA_LIST_IMPORTS = {'java.util.List'}
+JAVA_LIST_IMPORTS = ('java.util', 'List')
 
 # Java type used to instantiate lists
-JAVA_LIST_INSTANCE_IMPORTS = {'com.google.common.collect.ImmutableList'}
+JAVA_LIST_INSTANCE_IMPORTS = ('com.google.common.collect', 'ImmutableList')
 
 # regular expressions mapping yang types to Java types
 TYPE_PATTERNS_TO_JAVA = [
@@ -28,6 +28,30 @@ JAVA_WRAPPER_CLASSES = {
     "boolean": "Boolean",
     "double": "Double"
 }
+
+
+class ImportDict:
+    def __init__(self):
+        self.imports = {}
+
+    def add_import(self, package, clazz):
+        if package in self.imports:
+            self.imports[package].add(clazz)
+        else:
+            self.imports[package] = {clazz}
+
+    def merge(self, other):
+        for package, classes in other.imports.items():
+            if package not in self.imports:
+                self.imports[package] = set()
+            self.imports[package] |= classes
+
+    def get_imports(self):
+        imports = set()
+        for package, classes in self.imports.items():
+            for cls in classes:
+                imports.add('%s.%s' % (package, cls))
+        return imports
 
 
 def type_to_java(yang):
@@ -92,17 +116,12 @@ class NodeWrapper:
                 logging.info("No wrapper for yang type: %s (%s)" % (child.keyword, child.arg))
         # statements that might be available in general
         for stmt in statement.substmts:
+            # store the description if available
             if stmt.keyword == 'description' and stmt.arg.lower() != "none":
                 self.description = stmt.arg
+            # is the node configurable
             elif stmt.keyword == 'config':
                 self.config = statement.arg.lower() == 'true'
-
-    def name(self):
-        """
-        Shortcut for accessing the statement's argument
-        :return: name of the YANG node
-        """
-        return self.statement.arg
 
     def package(self):
         """
@@ -183,6 +202,9 @@ class Module(NodeWrapper):
         # TODO: might need additional processing
         self.classes[class_name] = wrapped_description
 
+    def del_class(self, class_name):
+        self.classes.pop(class_name)
+
     def add_typedef(self, typedef_name, wrapped_description):
         # TODO: might need additional processing
         self.typedefs[typedef_name] = wrapped_description
@@ -218,6 +240,11 @@ class Typonder(NodeWrapper):
                 # does the statement contain a type definition
                 elif hasattr(stmt, 'i_typedef'):
                     self.type = TypeDef(stmt.i_typedef, self)
+                else:
+                    logging.warning("Unmatched type: %s", stmt.arg)
+
+    def member_imports(self):
+        return self.type.java_imports
 
 
 class BaseType(NodeWrapper):
@@ -227,6 +254,7 @@ class BaseType(NodeWrapper):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
+        self.java_imports = ImportDict()
         self.java_type = type_to_java(statement.arg)
         # is a cast needed to use hashCode
         self.java_cast = JAVA_WRAPPER_CLASSES.get(self.java_type, None)
@@ -255,6 +283,8 @@ class Enumeration(NodeWrapper):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
+        self.java_imports = ImportDict()
+        self.java_imports.add_import(self.package(), java_class_name(self.statement.arg))
         self.enums = OrderedDict()
         self.group = 'enum'
         # loop through substatements and extract the enum values
@@ -270,7 +300,7 @@ class Enumeration(NodeWrapper):
         return any(hasattr(data, 'javaname') for _, data in self.enums.items())
 
 
-class Union(Typonder):
+class Union(NodeWrapper):
     """
     Wrapper class for union statements
     """
@@ -281,10 +311,16 @@ class Union(Typonder):
         self.type = None
         # list of types that belong to the union
         self.types = {}
+        # FIXME: collect the imports
+        self.java_imports = OrderedDict()
         # look for type definitions
         for stmt in statement.substmts:
             if stmt.keyword == 'type':
-                if hasattr(stmt, 'i_typedef'):
+                # is the statement a base type
+                if any(re.match(r'^%s$' % pattern, stmt.arg) for pattern, _ in
+                       TYPE_PATTERNS_TO_JAVA):
+                    self.type = BaseType(stmt, self)
+                elif hasattr(stmt, 'i_typedef'):
                     typedef = TypeDef(stmt.i_typedef, self)
                     self.types[to_camelcase(typedef.java_type)] = typedef
 
@@ -298,10 +334,9 @@ class TypeDef(Typonder):
         super().__init__(statement, parent)
         self.group = 'type'
         self.java_type = java_class_name(statement.arg)
-        self.java_imports = set()
         # for external types an import is added
-        if self.statement.top.i_modulename != self.type.statement.top.i_modulename:
-            self.java_imports.add('%s.%s' % (self.type.package(), self.type.java_type))
+        self.java_imports = ImportDict()
+        self.java_imports.add_import(self.package(), self.java_type)
         # add type definition
         self.top().add_typedef(self.java_type, self)
 
@@ -313,21 +348,9 @@ class Leaf(Typonder):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.java_imports = set()
         self.java_type = self.type.java_type
-        # if the package of the type differs from the lesf's type
-        if self.yang_module != self.type.yang_module:
-            self.java_imports.add('%s.%s' % (self.type.package(), self.type.java_type))
-        # if the type already has imports
-        if hasattr(self.type, "member_imports"):
-            self.java_imports |= self.type.member_imports()
-
-    def member_imports(self):
-        """
-        Imports that are needed by the parent
-        :return:
-        """
-        return self.java_imports
+        self.java_imports = ImportDict()
+        self.java_imports.merge(self.type.java_imports)
 
 
 class LeafRef(NodeWrapper):
@@ -337,22 +360,14 @@ class LeafRef(NodeWrapper):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.java_imports = set()
+        self.java_imports = ImportDict()
         type_spec = statement.i_type_spec
         # The target is defined in the module tree but might not be for unused groupings.
         if hasattr(type_spec, 'i_target_node'):
             self.group = 'ref'
             self.reference = Leaf(type_spec.i_target_node, self)
             self.java_type = self.reference.java_type
-            # if the referenced type is in another module, add the import
-            if self.yang_module != self.reference.yang_module:
-                self.java_imports.add('%s.%s' % (self.reference.package(), self.java_type))
-
-    def member_imports(self):
-        """
-        :return: a set of imports needed for the leaf reference
-        """
-        return self.java_imports
+            self.java_imports.add_import(self.reference.package(), self.java_type)
 
 
 class LeafList(Typonder):
@@ -362,39 +377,17 @@ class LeafList(Typonder):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
+        self.java_imports = ImportDict()
+        self.java_imports.add_import(JAVA_LIST_IMPORTS[0], JAVA_LIST_IMPORTS[1])
         self.group = 'list'
         # if the type of the list elements is defined
         if hasattr(self, 'type') and hasattr(self.type, 'java_type'):
             self.java_type = 'List<%s>' % self.type.java_type
             # in case of leafrefs this attribute is available
-            self.java_imports = getattr(self.type, 'java_imports', set())
-            # this is used for typedefs
-            if self.package() != self.type.package():
-                self.java_imports.add('%s.%s' % (self.type.package(), self.type.java_type))
+            self.java_imports.merge(self.type.java_imports)
         # else we use a generic list
         else:
             self.java_type = 'List'
-
-    # def instance_imports(self):
-    #     """
-    #     Imports needed for instantiating this type.
-    #     :return: instance imports
-    #     """
-    #     return JAVA_LIST_INSTANCE
-    #
-    # def internal_interface_imports(self):
-    #     """
-    #     Imports needed for interfaces inside the same module.
-    #     :return: internal interface imports
-    #     """
-    #     return JAVA_LIST_IMPORTS
-    #
-    # def interface_imports(self):
-    #     """
-    #     Imports needed for an interface access.
-    #     :return: interface imports
-    #     """
-    #     return JAVA_LIST_IMPORTS | getattr(self, 'java_imports', set())
 
 
 class Grouponder(NodeWrapper):
@@ -405,6 +398,7 @@ class Grouponder(NodeWrapper):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.vars = OrderedDict()
+        self.uses = OrderedDict()
         # find all available variables in the sub-statements
         for stmt in statement.substmts:
             keyword = stmt.keyword
@@ -420,6 +414,12 @@ class Grouponder(NodeWrapper):
                 result = List(stmt, self)
             elif keyword == 'container':
                 result = Container(stmt, self)
+            elif stmt.keyword == 'uses':
+                # class name for the import
+                class_name = java_class_name(stmt.i_grouping.arg)
+                # add the grouping to the list of super classes
+                self.uses[class_name] = Grouping(stmt.i_grouping, self)
+                self.top().add_class(class_name, self.uses[class_name])
             # if a result is available add it to the variables
             if result is not None:
                 # store the yang name
@@ -429,23 +429,40 @@ class Grouponder(NodeWrapper):
                 java_name = to_camelcase(java_name)
                 self.vars[java_name] = result
 
-    # def instance_imports(self):
-    #     """
-    #      Imports needed for instantiating this type.
-    #      :return: instance imports
-    #      """
-    #     return {imp for data in self.vars.values()
-    #             if hasattr(data, 'instance_imports')
-    #             for imp in data.instance_imports()}
-    #
-    # def interface_imports(self):
-    #     """
-    #     Imports needed for an interface access.
-    #     :return: interface imports
-    #     """
-    #     return {imp for data in self.vars.values()
-    #             if data.interface_imports() is not None
-    #             for imp in data.interface_imports()}
+    def inherited_vars(self):
+        """
+        Collects a dictionary of inherited variables that are needed for super calls.
+        :return: dictionary of inherited variables
+        """
+        result = OrderedDict()
+        for name, parent_group in self.uses.items():
+            # collect variables that are inherited by the parent
+            for inh_name, var in parent_group.inherited_vars().items():
+                result[inh_name] = var
+            # collect variables available in the parent class
+            for var_name, var in parent_group.vars.items():
+                result[var_name] = var
+        return result
+
+    def imports(self):
+        """
+        Collects all the imports that are needed for the grouping.
+        :return: set of imports
+        """
+        imports = ImportDict()
+        # for inherit in self.inherits.values():
+        #     imports.merge(inherit.inheritance_imports())
+        # for child in self.vars.values():
+        #     if not hasattr(child, "is_base"):
+        #         imports.merge(child.member_imports())
+        for child in self.children.values():
+            imports.merge(child.java_imports)
+        for inherit in self.uses.values():
+            imports.merge(inherit.inheritance_imports())
+        for var in self.vars.values():
+            if hasattr(var, 'group') and var.group == 'list':
+                imports.add_import(JAVA_LIST_INSTANCE_IMPORTS[0],JAVA_LIST_INSTANCE_IMPORTS[1])
+        return imports.get_imports()
 
 
 class Grouping(Grouponder):
@@ -455,90 +472,55 @@ class Grouping(Grouponder):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.inherits = OrderedDict()
-        for stmt in statement.substmts:
-            if stmt.keyword == 'uses':
-                # class name for the import
-                class_name = java_class_name(stmt.i_grouping.arg)
-                # add the grouping to the list of super classes
-                self.inherits[class_name] = Grouping(stmt.i_grouping, self)
         # own Java type name
         self.java_type = java_class_name(statement.arg)
 
     def type(self):
         if not self.vars:
-            if len(self.inherits) == 1:
-                return next(self.inherits.keys())
+            if len(self.uses) == 1:
+                return next(self.uses.keys())
         return None
 
-    # def inherited_vars(self):
-    #     """
-    #     Collects a dictionary of inherited variables that are needed for super calls.
-    #     :return: dictionary of inherited variables
-    #     """
-    #     result = OrderedDict()
-    #     for name, parent_group in self.inherits.items():
-    #         # collect variables that are inherited by the parent
-    #         for inh_name, var in parent_group.inherited_vars().items():
-    #             result[inh_name] = var
-    #         # collect variables available in the parent class
-    #         for var_name, var in parent_group.vars.items():
-    #             result[var_name] = var
-    #     return result
-    #
-    # def inheritance_imports(self):
-    #     """
-    #     Collects the set of imports that is needed due to inherited variables.
-    #     :return: inheritance imports
-    #     """
-    #     result = set()
-    #     # go through all super classes (hopefully one)
-    #     for inherit in self.inherits.values():
-    #         # if external we need to add all interface imports
-    #         # if inherit.is_external:
-    #         #     result |= inherit.interface_imports()
-    #         # check if the variables need an import, e.g. lists
-    #         for var in inherit.vars.values():
-    #             if hasattr(var, 'internal_interface_imports'):
-    #                 result |= var.internal_interface_imports()
-    #         # add recursive inheritance imports
-    #         result |= inherit.inheritance_imports()
-    #     return result
-    #
-    def imports(self):
-        """
-        Collects all the imports that are needed for the grouping.
-        :return: set of imports
-        """
-        # TODO: the imports from parent class
-        # extends = {'%s.%s' % (inherit.package(), name) for name, inherit in self.inherits.items()}
-        # imports for own children
-        imports = set()
-        for child in self.children.values():
-            if not hasattr(child, "is_base"):
-                imports |= child.member_imports()
+    def inheritance_imports(self):
+        imports = ImportDict()
+        imports.add_import(self.package(), java_class_name(self.statement.arg))
         return imports
 
 
-class Container(Grouping):
+class Container(Grouponder):
     """
     Wrapper class for container statements.
     """
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.java_import = set()
-        # check if we need to import this container for the parent
-        if self.yang_module != self.parent.yang_module:
-            self.java_import.add('%s.%s' % (self.package(), self.java_type))
+        # own Java type name
+        self.java_type = java_class_name(statement.arg)
+        self.java_imports = ImportDict()
+        self.java_imports.add_import(self.package(), java_class_name(statement.arg))
         # this container results in a java class
-        self.top().add_class(java_class_name(statement.arg), self)
+        if self.parent == self.top():
+            # fixing name collision in the ONF TAPI: context
+            class_name = java_class_name(statement.arg) + "Top"
+            for name in self.uses.keys():
+                self.uses.pop(name)
+                self.top().del_class(name)
+            for ch_name, ch_wrapper in self.children.items():
+                # store the yang name
+                ch_wrapper.name = ch_wrapper.statement.arg
+                # remove leading underscores from the name
+                java_name = re.sub(r'^_', '', ch_wrapper.name)
+                java_name = to_camelcase(java_name)
+                self.vars[java_name] = ch_wrapper
+        else:
+            class_name = java_class_name(statement.arg)
+        self.top().add_class(class_name, self)
 
     def member_imports(self):
-        return self.java_import
+        return self.java_imports
 
 
-class List(Grouping):
+class List(Grouponder):
     """
     Wrapper class for list statements.
     """
@@ -546,14 +528,14 @@ class List(Grouping):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.group = 'list'
+        self.java_imports = ImportDict()
+        self.java_imports.add_import(JAVA_LIST_IMPORTS[0], JAVA_LIST_IMPORTS[1])
         # check if a super class exists
-        for stmt in statement.substmts:
-            if stmt.keyword == 'uses':
-                self.type = Grouping(stmt.i_grouping, self)
-                if self.package() != self.type.package():
-                    self.java_import = {'%s.%s' % (self.type.package(), self.type.java_type)}
+        if self.uses:
+            self.type = next(iter(self.uses.values()))
+            self.java_imports.merge(self.type.inheritance_imports())
         # if children are available, a helper class is needed
-        if self.children:
+        if self.children and len(self.children) == len(self.vars):
             helper_name = java_class_name(statement.arg) + JAVA_LIST_CLASS_APPENDIX
             self.top().add_class(helper_name, self)
             self.java_type = 'List<%s>' % helper_name
@@ -562,23 +544,6 @@ class List(Grouping):
                 self.java_type = 'List<%s>' % self.type.java_type
             else:
                 self.java_type = 'List'
-
-    def member_imports(self):
-        imports = set()
-        imports |= JAVA_LIST_IMPORTS
-        imports |= JAVA_LIST_INSTANCE_IMPORTS
-        # TODO: list type import
-        return imports
-
-    # def imports(self):
-    #     return JAVA_LIST_INSTANCE | self.interface_imports()
-    #
-    # def interface_imports(self):
-    #     imports = set()
-    #     if self.children:
-    #         for child in self.children.values():
-    #             imports |= child.interface_imports()
-    #     return JAVA_LIST_IMPORTS | imports
 
 
 class Input(Grouponder):
@@ -609,12 +574,12 @@ class RPC(NodeWrapper):
             elif stmt.keyword == 'output':
                 self.output = Output(stmt, self)
 
-    # def imports(self):
-    #     # currently only input imports are needed
-    #     if hasattr(self, 'input'):
-    #         return self.input.interface_imports()
-    #     else:
-    #         return set()
+                # def imports(self):
+                #     # currently only input imports are needed
+                #     if hasattr(self, 'input'):
+                #         return self.input.interface_imports()
+                #     else:
+                #         return set()
 
 
 YANG_NODE_TO_WRAPPER = {
@@ -624,4 +589,7 @@ YANG_NODE_TO_WRAPPER = {
     "grouping": Grouping,
     "list": List,
     "leaf": Leaf,
+    "input": Input,
+    "output": Output,
+    "leaf-list": LeafList,
 }
