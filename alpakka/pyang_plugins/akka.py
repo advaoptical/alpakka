@@ -110,14 +110,15 @@ class AkkaPlugin(plugin.PyangPlugin):
         # generate unions
         self.fill_template('union.jinja', module.unions())
         # generate routes for the data tree
-        self.fill_template('tree.jinja', {'mymodule': module})
+        self.fill_template('tree.jinja', {'Tree': module})
         # run only if rpcs are available
         if module.rpcs:
             if_name = '%sInterface' % module.java_name
             rpc_imports = {imp for rpc in module.rpcs.values()
                            if hasattr(rpc, 'imports')
                            for imp in rpc.imports()}
-            rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports, 'package': module.package()}
+            rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports, 'package': module.package(),
+                        'path': module.subpath()}
             self.fill_template('backend_interface.jinja', {if_name: rpc_dict})
             rpc_dict['interface_name'] = if_name
             self.fill_template('backend_impl.jinja',
@@ -132,8 +133,12 @@ class AkkaPlugin(plugin.PyangPlugin):
         """
         template = self.env.get_template(template_name)
         for key, context in description_dict.items():
+            if hasattr(context, 'subpath'):
+                subpath = context.subpath()
+            else:
+                subpath = context['path']
             # get the output path for the file
-            output_path = "%s/%s" % (self.output_path, context.subpath())
+            output_path = "%s/%s" % (self.output_path, subpath)
             # create folder if not available
             if not os.path.exists(output_path):
                 os.makedirs(output_path)

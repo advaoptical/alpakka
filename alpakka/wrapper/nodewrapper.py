@@ -234,11 +234,19 @@ class Module(NodeWrapper):
         """
         self.classes.pop(class_name)
 
+    def add_rpc(self, rpc_name, wrapped_description):
+        """
+        Add an RPC that needs to be generated.
+        :param rpc_name: the name of the RPC
+        :param wrapped_description:  the wrapped node description
+        """
+        self.rpcs[rpc_name] = wrapped_description
+
     def add_typedef(self, typedef_name, wrapped_description):
         """
         Add a type definition that needs to be generated.
-        :param typedef_name:
-        :param wrapped_description:
+        :param typedef_name: the name of the type definition
+        :param wrapped_description: the wrapped node description
         """
         # TODO: might need additional processing
         self.typedefs[typedef_name] = wrapped_description
@@ -620,13 +628,14 @@ class RPC(NodeWrapper):
                 self.input = Input(stmt, self)
             elif stmt.keyword == 'output':
                 self.output = Output(stmt, self)
+        self.top().add_rpc(self.java_name, self)
 
-                # def imports(self):
-                #     # currently only input imports are needed
-                #     if hasattr(self, 'input'):
-                #         return self.input.interface_imports()
-                #     else:
-                #         return set()
+    # def imports(self):
+    #     # currently only input imports are needed
+    #     if hasattr(self, 'input'):
+    #         return self.input.interface_imports()
+    #     else:
+    #         return set()
 
 
 YANG_NODE_TO_WRAPPER = {

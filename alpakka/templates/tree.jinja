@@ -10,12 +10,12 @@ import {{ import }};
 public class {{ name }} extends AllDirectives {
 
   public Route get{{ name }}Route() {
-  return get(()->
+  return get(()-> {% if ctx.children | length > 1 %} route( {%endif%}
   {%- for name, child in ctx.children.items() recursive %}
   pathPrefix("{{ name }}", {% if child.children %} () -> route(
 {{ loop(child.children.items()) }}, {% else %} () -> {%- endif %} complete(StatusCodes.OK))
 {%- if child.children %}){% endif %}{% if not loop.last %},{% endif %}
-{%- endfor %}
+{%- endfor %}{% if ctx.children | length > 1 -%} ) {%- endif %}
   );
   }
 
