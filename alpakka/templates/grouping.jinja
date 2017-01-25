@@ -42,7 +42,7 @@ public class {{ name }} {% if ctx.uses %}extends {{ ctx.uses.keys() | first }} {
     {%- for key, var in ctx.vars.items() %}
     this.{{ key }} = {{ key }}
       {%- if 'list' in var.group %} != null ? ImmutableList.copyOf({{ key }}) : ImmutableList.
-        {%- if var.type.java_type %}<{{ var.type.java_type }}>
+        {%- if var.element_type %}<{{ var.element_type }}>
         {%- endif %}of()
       {%- endif %};{% endfor %}
   }

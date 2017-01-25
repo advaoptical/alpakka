@@ -499,7 +499,7 @@ class Container(Grouponder):
         self.java_imports = ImportDict()
         self.java_imports.add_import(self.package(), java_class_name(statement.arg))
         # this container results in a java class
-        if self.parent == self.top():
+        if 'tapi' in self.top().yang_module and self.parent == self.top():
             # fixing name collision in the ONF TAPI: context
             class_name = java_class_name(statement.arg) + "Top"
             for name in self.uses.keys():
@@ -534,13 +534,14 @@ class List(Grouponder):
         if self.uses:
             self.type = next(iter(self.uses.values()))
             self.java_imports.merge(self.type.inheritance_imports())
-        # if children are available, a helper class is needed
-        if self.children and len(self.children) == len(self.vars):
-            helper_name = java_class_name(statement.arg) + JAVA_LIST_CLASS_APPENDIX
-            self.top().add_class(helper_name, self)
-            self.java_type = 'List<%s>' % helper_name
+        # if new variables are defined, a helper class is needed
+        if self.children and 0 < len(self.vars):
+            self.element_type = java_class_name(statement.arg) + JAVA_LIST_CLASS_APPENDIX
+            self.top().add_class(self.element_type, self)
+            self.java_type = 'List<%s>' % self.element_type
         else:
             if hasattr(self, 'type') and hasattr(self.type, 'java_type'):
+                self.element_type = self.type.java_type
                 self.java_type = 'List<%s>' % self.type.java_type
             else:
                 self.java_type = 'List'
