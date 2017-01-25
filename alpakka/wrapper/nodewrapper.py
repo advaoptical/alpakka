@@ -31,22 +31,41 @@ JAVA_WRAPPER_CLASSES = {
 
 
 class ImportDict:
+    """
+    Class that is used to store imports. It wraps a dictionary and stores the classes per package.
+    This makes it easier to filter imports that are part of a package.
+    """
+
     def __init__(self):
+        # an empty dictionary
         self.imports = {}
 
     def add_import(self, package, clazz):
+        """
+        Adds an import.
+        :param package: the package of the import
+        :param clazz: the class of the import
+        """
         if package in self.imports:
             self.imports[package].add(clazz)
         else:
             self.imports[package] = {clazz}
 
     def merge(self, other):
+        """
+        Merges another dictionary into this one.
+        :param other: the dict to be merged
+        """
         for package, classes in other.imports.items():
             if package not in self.imports:
                 self.imports[package] = set()
             self.imports[package] |= classes
 
     def get_imports(self):
+        """
+        Converts the managed imports into a set of imports.
+        :return: a set of import strings
+        """
         imports = set()
         for package, classes in self.imports.items():
             for cls in classes:
@@ -154,12 +173,13 @@ class Module(NodeWrapper):
     """
 
     def __init__(self, statement, parent=None):
-        # prepare dictionaries
+        # IMPORTANT: prepare dictionaries before calling super init!
         self.classes = OrderedDict()
         self.rpcs = OrderedDict()
         self.typedefs = OrderedDict()
         # call the super constructor
         super().__init__(statement, parent)
+        # store the java name of the module
         self.java_name = java_class_name(statement.i_prefix)
 
     def enums(self):
@@ -199,13 +219,27 @@ class Module(NodeWrapper):
                 for imp in getattr(data, 'imports', ())}
 
     def add_class(self, class_name, wrapped_description):
+        """
+        Add a class to the collection that needs to be generated.
+        :param class_name: the class name to be used
+        :param wrapped_description: the wrapped node description
+        """
         # TODO: might need additional processing
         self.classes[class_name] = wrapped_description
 
     def del_class(self, class_name):
+        """
+        Deletes a class from the collection.
+        :param class_name: the class to be removed
+        """
         self.classes.pop(class_name)
 
     def add_typedef(self, typedef_name, wrapped_description):
+        """
+        Add a type definition that needs to be generated.
+        :param typedef_name:
+        :param wrapped_description:
+        """
         # TODO: might need additional processing
         self.typedefs[typedef_name] = wrapped_description
 
@@ -244,6 +278,9 @@ class Typonder(NodeWrapper):
                     logging.warning("Unmatched type: %s", stmt.arg)
 
     def member_imports(self):
+        """
+        :return: Imports that are needed for this type if it is a member of a class.
+        """
         return self.type.java_imports
 
 
@@ -450,18 +487,17 @@ class Grouponder(NodeWrapper):
         :return: set of imports
         """
         imports = ImportDict()
-        # for inherit in self.inherits.values():
-        #     imports.merge(inherit.inheritance_imports())
-        # for child in self.vars.values():
-        #     if not hasattr(child, "is_base"):
-        #         imports.merge(child.member_imports())
+        # imports from children
         for child in self.children.values():
             imports.merge(child.java_imports)
+        # imports from super classes
         for inherit in self.uses.values():
             imports.merge(inherit.inheritance_imports())
         for var in self.vars.values():
+            # checking if there is at least one list defined in the grouponder
             if hasattr(var, 'group') and var.group == 'list':
-                imports.add_import(JAVA_LIST_INSTANCE_IMPORTS[0],JAVA_LIST_INSTANCE_IMPORTS[1])
+                imports.add_import(JAVA_LIST_INSTANCE_IMPORTS[0], JAVA_LIST_INSTANCE_IMPORTS[1])
+                break
         return imports.get_imports()
 
 
@@ -476,12 +512,16 @@ class Grouping(Grouponder):
         self.java_type = java_class_name(statement.arg)
 
     def type(self):
+        # FIXME: needs fixing for more than one uses
         if not self.vars:
             if len(self.uses) == 1:
                 return next(self.uses.keys())
         return None
 
     def inheritance_imports(self):
+        """
+        :return: Imports needed if inheriting from this class.
+        """
         imports = ImportDict()
         imports.add_import(self.package(), java_class_name(self.statement.arg))
         return imports
@@ -514,9 +554,13 @@ class Container(Grouponder):
                 self.vars[java_name] = ch_wrapper
         else:
             class_name = java_class_name(statement.arg)
+        # add class that needs to be generated
         self.top().add_class(class_name, self)
 
     def member_imports(self):
+        """
+        :return: imports needed if this class is a member
+        """
         return self.java_imports
 
 
@@ -530,19 +574,21 @@ class List(Grouponder):
         self.group = 'list'
         self.java_imports = ImportDict()
         self.java_imports.add_import(JAVA_LIST_IMPORTS[0], JAVA_LIST_IMPORTS[1])
-        # check if a super class exists
+        # check if a super class exists and assign type
         if self.uses:
             self.type = next(iter(self.uses.values()))
             self.java_imports.merge(self.type.inheritance_imports())
-        # if new variables are defined, a helper class is needed
+        # if new variables are defined in the list, a helper class is needed
         if self.children and 0 < len(self.vars):
             self.element_type = java_class_name(statement.arg) + JAVA_LIST_CLASS_APPENDIX
             self.top().add_class(self.element_type, self)
             self.java_type = 'List<%s>' % self.element_type
         else:
+            # if a type is defined use it
             if hasattr(self, 'type') and hasattr(self.type, 'java_type'):
                 self.element_type = self.type.java_type
                 self.java_type = 'List<%s>' % self.type.java_type
+            # unknown list elements
             else:
                 self.java_type = 'List'
 
