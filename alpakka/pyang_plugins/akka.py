@@ -75,16 +75,20 @@ class AkkaPlugin(plugin.PyangPlugin):
 
     def emit(self, ctx, modules, writef):
         self.get_options(ctx)
+        unique_modules = set()
+        # collect set of unique modules, avoid wrapping the same one multiple times
         for module in modules:
             for module_details, context_module in module.i_ctx.modules.items():
-                if context_module.i_children:
-                    logging.info("Wrapping module %s (%s)", module_details[0], module_details[1])
-                    # wrap module statement
-                    wrapped_module = wrap_module(context_module)
-                    self.generate_classes(wrapped_module)
-                else:
-                    logging.info("No children in module %s (%s)", module_details[0],
-                                 module_details[1])
+                unique_modules.add(context_module)
+        # wrap unique modules
+        for module in unique_modules:
+            if context_module.i_children:
+                logging.info("Wrapping module %s (%s)", module.arg, module.i_latest_revision)
+                # wrap module statement
+                wrapped_module = wrap_module(context_module)
+                self.generate_classes(wrapped_module)
+            else:
+                logging.info("No children in module %s (%s)", module.arg, module.i_latest_revision)
 
     def get_options(self, ctx):
         """
