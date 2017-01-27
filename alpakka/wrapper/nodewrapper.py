@@ -225,7 +225,12 @@ class Module(NodeWrapper):
         :param wrapped_description: the wrapped node description
         """
         # TODO: might need additional processing
-        self.classes[class_name] = wrapped_description
+        if class_name in self.classes.keys():
+            logging.debug("Class already in the list: %s", class_name)
+            if len(wrapped_description.children) != len(self.classes[class_name].children):
+                logging.warning("Number of children does not match for %s")
+        else:
+            self.classes[class_name] = wrapped_description
 
     def del_class(self, class_name):
         """
