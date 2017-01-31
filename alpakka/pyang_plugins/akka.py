@@ -82,10 +82,10 @@ class AkkaPlugin(plugin.PyangPlugin):
                 unique_modules.add(context_module)
         # wrap unique modules
         for module in unique_modules:
-            if context_module.i_children:
+            if module.i_children:
                 logging.info("Wrapping module %s (%s)", module.arg, module.i_latest_revision)
                 # wrap module statement
-                wrapped_module = wrap_module(context_module)
+                wrapped_module = wrap_module(module)
                 self.generate_classes(wrapped_module)
             else:
                 logging.info("No children in module %s (%s)", module.arg, module.i_latest_revision)
