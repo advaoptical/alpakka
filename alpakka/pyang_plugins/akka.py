@@ -5,7 +5,7 @@ import os
 from jinja2 import Environment, PackageLoader
 from pyang import plugin
 
-from alpakka.wrapper import wrap_module
+from alpakka.wrapper import wrap_module, nodewrapper
 
 
 def firstupper(value):
@@ -102,7 +102,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         """
         # set package prefix
         if ctx.opts.akka_prefix:
-            self.prefix = ctx.opts.akka_prefix
+            nodewrapper.NodeWrapper.prefix = ctx.opts.akka_prefix
         # set output path
         if ctx.opts.akka_output:
             self.output_path = ctx.opts.akka_output

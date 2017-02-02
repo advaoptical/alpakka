@@ -115,6 +115,7 @@ class NodeWrapper:
     """
     Base class for node wrappers. It includes the base setup.
     """
+    prefix = ""
 
     def __init__(self, statement, parent):
         # members that are available for all nodes
@@ -147,14 +148,21 @@ class NodeWrapper:
         The pakackage name of this module.
         :return: the package name
         """
-        return self.yang_module.lower().replace("-", ".")
+        if NodeWrapper.prefix:
+            return '%s.%s' % (NodeWrapper.prefix, self.yang_module.lower().replace("-", "."))
+        else:
+            return self.yang_module.lower().replace("-", ".")
 
     def subpath(self):
         """
         The subpath of this module.
         :return: the package name
         """
-        return self.yang_module.lower().replace("-", "/")
+        if NodeWrapper.prefix:
+            return '%s/%s' % (NodeWrapper.prefix.replace(".", "/"),
+                              self.yang_module.lower().replace("-", "/"))
+        else:
+            return self.yang_module.lower().replace("-", "/")
 
     def top(self):
         """
