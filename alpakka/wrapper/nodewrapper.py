@@ -523,6 +523,8 @@ class Grouping(Grouponder):
         super().__init__(statement, parent)
         # own Java type name
         self.java_type = java_class_name(statement.arg)
+        self.java_imports = ImportDict()
+        self.java_imports.add_import(self.package(), self.java_type)
 
     def type(self):
         # FIXME: needs fixing for more than one uses
@@ -535,9 +537,10 @@ class Grouping(Grouponder):
         """
         :return: Imports needed if inheriting from this class.
         """
-        imports = ImportDict()
-        imports.add_import(self.package(), java_class_name(self.statement.arg))
-        return imports
+        return self.java_imports
+
+    def member_imports(self):
+        return self.java_imports
 
 
 class Container(Grouponder):
@@ -562,11 +565,17 @@ class Container(Grouponder):
                 java_name = re.sub(r'^_', '', ch_wrapper.name)
                 java_name = to_camelcase(java_name)
                 self.vars[java_name] = ch_wrapper
+                self.top().add_class(self.java_type, self)
+                self.java_imports.add_import(self.package(), self.java_type)
+        # containers that just import a grouping don't need a new class -> variable
+        elif len(self.uses) == 1 and len(self.vars) == 0:
+            class_item = next(iter(self.uses.values()))
+            self.java_type = class_item.java_type
+            self.java_imports = class_item.member_imports()
         else:
             self.java_type = java_class_name(statement.arg)
-        # add class that needs to be generated
-        self.top().add_class(self.java_type, self)
-        self.java_imports.add_import(self.package(), self.java_type)
+            self.top().add_class(self.java_type, self)
+            self.java_imports.add_import(self.package(), self.java_type)
 
     def member_imports(self):
         """
@@ -633,12 +642,12 @@ class RPC(NodeWrapper):
                 self.output = Output(stmt, self)
         self.top().add_rpc(self.java_name, self)
 
-    # def imports(self):
-    #     # currently only input imports are needed
-    #     if hasattr(self, 'input'):
-    #         return self.input.interface_imports()
-    #     else:
-    #         return set()
+        # def imports(self):
+        #     # currently only input imports are needed
+        #     if hasattr(self, 'input'):
+        #         return self.input.interface_imports()
+        #     else:
+        #         return set()
 
 
 YANG_NODE_TO_WRAPPER = {
