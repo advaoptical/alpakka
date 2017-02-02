@@ -228,7 +228,7 @@ class Module(NodeWrapper):
         if class_name in self.classes.keys():
             logging.debug("Class already in the list: %s", class_name)
             if len(wrapped_description.children) != len(self.classes[class_name].children):
-                logging.warning("Number of children does not match for %s")
+                logging.warning("Number of children does not match for %s", class_name)
         else:
             self.classes[class_name] = wrapped_description
 
@@ -547,14 +547,11 @@ class Container(Grouponder):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        # own Java type name
-        self.java_type = java_class_name(statement.arg)
         self.java_imports = ImportDict()
-        self.java_imports.add_import(self.package(), java_class_name(statement.arg))
         # this container results in a java class
         if 'tapi' in self.top().yang_module and self.parent == self.top():
             # fixing name collision in the ONF TAPI: context
-            class_name = java_class_name(statement.arg) + "Top"
+            self.java_type = java_class_name(statement.arg) + "Top"
             for name in self.uses.keys():
                 self.uses.pop(name)
                 self.top().del_class(name)
@@ -566,9 +563,10 @@ class Container(Grouponder):
                 java_name = to_camelcase(java_name)
                 self.vars[java_name] = ch_wrapper
         else:
-            class_name = java_class_name(statement.arg)
+            self.java_type = java_class_name(statement.arg)
         # add class that needs to be generated
-        self.top().add_class(class_name, self)
+        self.top().add_class(self.java_type, self)
+        self.java_imports.add_import(self.package(), self.java_type)
 
     def member_imports(self):
         """
