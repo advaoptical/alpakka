@@ -68,7 +68,12 @@ class AkkaPlugin(plugin.PyangPlugin):
                                  dest="akka_prefix",
                                  action="store",
                                  help="package prefix to be prepended to the generated classes"
-                                 )
+                                 ),
+            optparse.make_option("--akka-beans-only",
+                                 action="store_true",
+                                 dest="beans_only",
+                                 default=False,
+                                 help="create just the beans without the akka classes")
         ]
         group = optparser.add_option_group("Akka output specific options")
         group.add_options(options)
@@ -101,6 +106,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         # set output path
         if ctx.opts.akka_output:
             self.output_path = ctx.opts.akka_output
+        self.beans_only = ctx.opts.beans_only
 
     def generate_classes(self, module):
         # generate enum classes
@@ -113,21 +119,23 @@ class AkkaPlugin(plugin.PyangPlugin):
         self.fill_template('grouping.jinja', module.classes)
         # generate unions
         self.fill_template('union.jinja', module.unions())
-        # generate routes for the data tree
-        self.fill_template('tree.jinja', {'Tree': module})
-        # run only if rpcs are available
-        if module.rpcs:
-            if_name = '%sInterface' % module.java_name
-            rpc_imports = {imp for rpc in module.rpcs.values()
-                           if hasattr(rpc, 'imports')
-                           for imp in rpc.imports()}
-            rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports, 'package': module.package(),
-                        'path': module.subpath()}
-            self.fill_template('backend_interface.jinja', {if_name: rpc_dict})
-            rpc_dict['interface_name'] = if_name
-            self.fill_template('backend_impl.jinja',
-                               {'%sBackend' % module.java_name: rpc_dict})
-            self.fill_template('routes.jinja', {'%sRoutes' % module.java_name: rpc_dict})
+        if not self.beans_only:
+            # generate routes for the data tree
+            self.fill_template('tree.jinja', {'Tree': module})
+            # run only if rpcs are available
+            if module.rpcs:
+                if_name = '%sInterface' % module.java_name
+                rpc_imports = {imp for rpc in module.rpcs.values()
+                               if hasattr(rpc, 'imports')
+                               for imp in rpc.imports()}
+                rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports,
+                            'package': module.package(),
+                            'path': module.subpath()}
+                self.fill_template('backend_interface.jinja', {if_name: rpc_dict})
+                rpc_dict['interface_name'] = if_name
+                self.fill_template('backend_impl.jinja',
+                                   {'%sBackend' % module.java_name: rpc_dict})
+                self.fill_template('routes.jinja', {'%sRoutes' % module.java_name: rpc_dict})
 
     def fill_template(self, template_name, description_dict):
         """
