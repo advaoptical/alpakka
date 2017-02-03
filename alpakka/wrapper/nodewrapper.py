@@ -20,6 +20,8 @@ TYPE_PATTERNS_TO_JAVA = [
     (r"string", "String"),
     (r"boolean", "boolean"),
     (r"decimal64", "double"),
+    (r"binary", "byte[]"),
+    (r"empty", "Object"),
 ]
 
 # Java wrapper classes for base types (needed for hashCode)
@@ -342,7 +344,8 @@ class Enumeration(NodeWrapper):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.java_imports = ImportDict()
-        self.java_imports.add_import(self.package(), java_class_name(self.statement.arg))
+        self.java_type =  java_class_name(self.statement.arg)
+        self.java_imports.add_import(self.package(), self.java_type)
         self.enums = OrderedDict()
         self.group = 'enum'
         # loop through substatements and extract the enum values
