@@ -109,7 +109,7 @@ def to_camelcase(string):
     :return: camel case representation of the string
     """
     string = string[0].lower() + string[1:]
-    return re.sub(r'[-](?P<first>[a-z])',
+    return re.sub(r'[-](?P<first>[a-zA-Z])',
                   lambda m: m.group('first').upper(), string)
 
 
@@ -133,7 +133,16 @@ class NodeWrapper:
         for child in getattr(statement, 'i_children', []):
             child_wrapper = YANG_NODE_TO_WRAPPER.get(child.keyword, None)
             if child_wrapper:
-                self.children[child.arg] = child_wrapper(child, self)
+                #START of special handling for choice statements:
+                if child.keyword == 'choice':
+                #skip adding the choice statement to the tree
+                    child_wrapper(child, self)
+                elif (self.statement.keyword == 'choice'):
+                    #add child case statements to the parent, not to self
+                    parent.children[child.arg] = child_wrapper(child, self)
+                #END of special handling for choice statement
+                else:
+                    self.children[child.arg] = child_wrapper(child, self)
             else:
                 logging.info("No wrapper for yang type: %s (%s)" % (child.keyword, child.arg))
         # statements that might be available in general
@@ -238,7 +247,7 @@ class Module(NodeWrapper):
         if class_name in self.classes.keys():
             logging.debug("Class already in the list: %s", class_name)
             if len(wrapped_description.children) != len(self.classes[class_name].children):
-                logging.warning("Number of children does not match for %s", class_name)
+                logging.warning("Number of children does not match for %s from module: %s ", class_name, self.classes[class_name].yang_module)
         else:
             self.classes[class_name] = wrapped_description
 
@@ -294,6 +303,8 @@ class Typonder(NodeWrapper):
                 # is the statement a lear reference
                 elif stmt.arg == 'leafref':
                     self.type = LeafRef(stmt, self)
+                elif stmt.arg == 'bits':
+                    self.type = Bits(statement, self)
                 # does the statement contain a type definition
                 elif hasattr(stmt, 'i_typedef'):
                     self.type = TypeDef(stmt.i_typedef, self)
@@ -321,6 +332,36 @@ class BaseType(NodeWrapper):
         self.group = 'base'
         self.is_base = True
 
+
+"""
+alternative class wrapper for bits and bit structure
+"""
+class Bits(NodeWrapper):
+    """
+    Wrapper class for bits statement
+    """
+
+    def __init__(self, statement, parent):
+        super().__init__(statement, parent)
+        self.java_imports = ImportDict()
+        self.java_type = java_class_name(self.statement.arg)
+        self.java_imports.add_import(self.package(), self.java_type)
+        self.bits = OrderedDict()
+        self.group = 'bits'
+        for stmt in statement.substmts:
+            if stmt.keyword == 'bit':
+                self.bits[stmt.arg] = Bit(stmt, self)
+
+class Bit(NodeWrapper):
+    """
+     Wrapper class for bit values.
+    """
+
+    def __init__(self, statement, parent):
+        super().__init__(statement, parent)
+        javaname = statement.arg
+        javaname = javaname.replace('-', '_').replace('.', '_')
+        self.javaname = javaname
 
 class Enum(NodeWrapper):
     """
@@ -451,6 +492,7 @@ class LeafList(Typonder):
             self.java_type = 'List'
 
 
+
 class Grouponder(NodeWrapper):
     """
     Base class for node wrappers that group variables.
@@ -536,6 +578,15 @@ class Grouping(Grouponder):
         self.java_type = java_class_name(statement.arg)
         self.java_imports = ImportDict()
         self.java_imports.add_import(self.package(), self.java_type)
+        #add 'case' object as variable when choice substatement exists in grouping
+        for sub_st in statement.substmts:
+            if sub_st.keyword == 'choice':
+                for case in sub_st.substmts:
+                    if case.keyword == 'case':
+                        java_name = to_camelcase(re.sub(r'^_', '', case.arg))
+                        var = Case(case, self)
+                        var.name = case.arg
+                        self.vars[java_name] = var
 
     def type(self):
         # FIXME: needs fixing for more than one uses
@@ -584,6 +635,14 @@ class Container(Grouponder):
             self.java_type = class_item.java_type
             self.java_imports = class_item.member_imports()
         else:
+            #process exception when statement has i_children but no variables
+            if len(statement.i_children) > 0 and len(self.vars) == 0:
+                #adding variables to container class class
+                for child in self.children.values():
+                    if child.statement.keyword in ['container', 'grouping', 'list', 'leaf-list']:
+                        child.name = child.statement.arg
+                        java_name = to_camelcase(child.name)
+                        self.vars[java_name] = child
             self.java_type = java_class_name(statement.arg)
             self.top().add_class(self.java_type, self)
             self.java_imports.add_import(self.package(), self.java_type)
@@ -622,6 +681,25 @@ class List(Grouponder):
             # unknown list elements
             else:
                 self.java_type = 'List'
+
+
+class Choice(Grouponder):
+    def __init__(self, statement, parent):
+        super().__init__(statement, parent)
+        # self.java_imports = ImportDict()
+        # #add individual class for each case statement
+        # for child in self.children.values():
+        #     self.top().add_class(child.java_type, child)
+        #     self.java_imports.add_import(child.package(), child.java_type)
+
+
+class Case(Grouponder):
+    def __init__(self, statement, parent):
+        super().__init__(statement, parent)
+        self.java_imports = ImportDict()
+        self.java_type = java_class_name(self.statement.arg)+ 'CaseType'
+        self.top().add_class(self.java_type, self)
+        self.java_imports.add_import(self.package(), self.java_type)
 
 
 class Input(Grouponder):
@@ -671,4 +749,6 @@ YANG_NODE_TO_WRAPPER = {
     "input": Input,
     "output": Output,
     "leaf-list": LeafList,
+    "choice": Choice,
+    "case": Case,
 }
