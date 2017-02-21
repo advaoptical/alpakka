@@ -247,7 +247,16 @@ class Module(NodeWrapper):
         if class_name in self.classes.keys():
             logging.debug("Class already in the list: %s", class_name)
             if len(wrapped_description.children) != len(self.classes[class_name].children):
-                logging.warning("Number of children does not match for %s from module: %s ", class_name, self.classes[class_name].yang_module)
+                logging.warning("Number of children does not match for %s from stored module %s to new module %s", class_name, self.classes[class_name].yang_module, self.yang_module)
+            # print(self.classes[class_name].children.keys())
+            old = set(self.classes[class_name].children.keys())
+            new = set(wrapped_description.children.keys())
+            #print the different children
+            if old-new!=set():
+                logging.warning(" STORED class %s from module %s has additional children :%s", class_name, self.classes[class_name].yang_module, old - new)
+            if new-old!=set():
+                logging.warning(" NEW class %s from module %s has additional children :%s", class_name, self.yang_module, new - old)
+
         else:
             self.classes[class_name] = wrapped_description
 
@@ -385,8 +394,8 @@ class Enumeration(NodeWrapper):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.java_imports = ImportDict()
-        self.java_type =  java_class_name(self.statement.arg)
-        self.java_imports.add_import(self.package(), self.java_type)
+        self.java_type = java_class_name(self.statement.arg)
+        self.java_imports.add_import(self.package(), java_class_name(self.parent.statement.arg))
         self.enums = OrderedDict()
         self.group = 'enum'
         # loop through substatements and extract the enum values
@@ -413,8 +422,7 @@ class Union(NodeWrapper):
         self.type = None
         # list of types that belong to the union
         self.types = {}
-        # FIXME: collect the imports
-        self.java_imports = OrderedDict()
+        self.java_imports = ImportDict()
         # look for type definitions
         for stmt in statement.substmts:
             if stmt.keyword == 'type':
@@ -425,6 +433,12 @@ class Union(NodeWrapper):
                 elif hasattr(stmt, 'i_typedef'):
                     typedef = TypeDef(stmt.i_typedef, self)
                     self.types[to_camelcase(typedef.java_type)] = typedef
+                    if NodeWrapper.prefix:
+                        package = '%s.%s' % (NodeWrapper.prefix, stmt.i_typedef.i_module.arg.lower().replace("-", "."))
+                    else:
+                        package = stmt.i_typedef.i_module.arg.lower().replace("-", ".")
+                    self.java_imports.add_import(package, typedef.java_type)
+
 
 
 class TypeDef(Typonder):
@@ -435,12 +449,15 @@ class TypeDef(Typonder):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.group = 'type'
-        self.java_type = java_class_name(statement.arg)
-        # for external types an import is added
         self.java_imports = ImportDict()
-        self.java_imports.add_import(self.package(), self.java_type)
-        # add type definition
-        self.top().add_typedef(self.java_type, self)
+        if self.type.group == 'ref':
+            self.java_type = self.type.java_type
+            self.java_imports.merge(self.type.java_imports)
+        else:
+            self.java_type = java_class_name(statement.arg)
+            # add type definition
+            self.top().add_typedef(self.java_type, self)
+            self.java_imports.add_import(self.package(), self.java_type)
 
 
 class Leaf(Typonder):
@@ -469,7 +486,7 @@ class LeafRef(NodeWrapper):
             self.group = 'ref'
             self.reference = Leaf(type_spec.i_target_node, self)
             self.java_type = self.reference.java_type
-            self.java_imports.add_import(self.reference.package(), self.java_type)
+            self.java_imports.merge(self.reference.java_imports)
 
 
 class LeafList(Typonder):
@@ -664,15 +681,29 @@ class List(Grouponder):
         self.group = 'list'
         self.java_imports = ImportDict()
         self.java_imports.add_import(JAVA_LIST_IMPORTS[0], JAVA_LIST_IMPORTS[1])
-        # check if a super class exists and assign type
+        #check if a super class exists and assign type
         if self.uses:
-            self.type = next(iter(self.uses.values()))
-            self.java_imports.merge(self.type.inheritance_imports())
+            for use in self.uses.values():
+                for child in use.children.values():
+                    child.name = child.statement.arg
+                    java_name = to_camelcase(child.statement.arg)
+                    self.vars[java_name] = child
+
+            # self.java_imports.add_import(self.package(), self.java_type)
+            # self.type = next(iter(self.uses.values()))
+            # self.java_imports.merge(self.type.inheritance_imports())
+        #check for any other childrent not already in the variable list and add them
+        for child_wr in self.children.values():
+            if child_wr not in self.vars.values():
+                child_wr.name = child_wr.statement.arg
+                java_name = to_camelcase(child_wr.statement.arg)
+                self.vars[java_name] = child_wr
         # if new variables are defined in the list, a helper class is needed
         if self.children and 0 < len(self.vars):
             self.element_type = java_class_name(statement.arg) + JAVA_LIST_CLASS_APPENDIX
             self.top().add_class(self.element_type, self)
             self.java_type = 'List<%s>' % self.element_type
+            self.java_imports.add_import(self.package(), self.element_type)
         else:
             # if a type is defined use it
             if hasattr(self, 'type') and hasattr(self.type, 'java_type'):

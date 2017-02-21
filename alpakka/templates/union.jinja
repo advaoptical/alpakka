@@ -3,6 +3,9 @@ package {{ ctx.package() }};
 
 import java.io.Serializable;
 import java.util.Objects;
+{% for import in ctx.type.java_imports.get_imports() %}
+import {{ import }};
+{%- endfor %}
 
 {{ class_description(ctx.description) }}
 public class {{ name }} implements Serializable {
