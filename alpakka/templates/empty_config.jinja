@@ -1,0 +1,8 @@
+  {% if ctx.children | length > 1 %} route( {%endif%}
+  {%- for name, child in ctx.children.items() recursive %}
+  <{{ name }}> {% if child.children %}
+{{ loop(child.children.items()) }} {% else %} def_config </{{ name }}>{%- endif %}
+{%- if child.children %}
+  </{{ name }}>{% endif %}
+{%- endfor %}{% if ctx.children | length > 1 -%} </{{ name }}> {%- endif %}
+
