@@ -14,6 +14,9 @@ JAVA_LIST_IMPORTS = ('java.util', 'List')
 # Java type used to instantiate lists
 JAVA_LIST_INSTANCE_IMPORTS = ('com.google.common.collect', 'ImmutableList')
 
+# list of reserved words in Java
+JAVA_RESERVED_WORDS = frozenset(["switch", "case"])
+
 # regular expressions mapping yang types to Java types
 TYPE_PATTERNS_TO_JAVA = [
     (r"u?int\d*", "int"),
@@ -108,9 +111,27 @@ def to_camelcase(string):
     :param string: string to be processed
     :return: camel case representation of the string
     """
-    string = string[0].lower() + string[1:]
-    return re.sub(r'[-](?P<first>[a-zA-Z])',
-                  lambda m: m.group('first').upper(), string)
+    name = string[0].lower() + string[1:]
+    name = re.sub(r'[-](?P<first>[a-zA-Z])', lambda m: m.group('first').upper(), name)
+    # check if the name is a reserved word and prepend '_'
+    if name in JAVA_RESERVED_WORDS:
+        return '_%s' % name
+    else:
+        return name
+
+
+def to_package(string, prefix=None):
+    """
+    Converts the string to a package name by making it lower case, replacing '-' with '.' and
+    adding a prefix if available.
+    :param string: the string to be converted
+    :param prefix: the prefix for the package
+    :return: package name
+    """
+    package = string.lower().replace("-", ".")
+    if prefix:
+        package = '%s.%s' % (prefix, package)
+    return package
 
 
 class NodeWrapper:
@@ -133,14 +154,14 @@ class NodeWrapper:
         for child in getattr(statement, 'i_children', []):
             child_wrapper = YANG_NODE_TO_WRAPPER.get(child.keyword, None)
             if child_wrapper:
-                #START of special handling for choice statements:
+                # START of special handling for choice statements:
                 if child.keyword == 'choice':
-                #skip adding the choice statement to the tree
+                    # skip adding the choice statement to the tree
                     child_wrapper(child, self)
-                elif (self.statement.keyword == 'choice'):
-                    #add child case statements to the parent, not to self
+                elif self.statement.keyword == 'choice':
+                    # add child case statements to the parent, not to self
                     parent.children[child.arg] = child_wrapper(child, self)
-                #END of special handling for choice statement
+                # END of special handling for choice statement
                 else:
                     self.children[child.arg] = child_wrapper(child, self)
             else:
@@ -159,10 +180,7 @@ class NodeWrapper:
         The pakackage name of this module.
         :return: the package name
         """
-        if NodeWrapper.prefix:
-            return '%s.%s' % (NodeWrapper.prefix, self.yang_module.lower().replace("-", "."))
-        else:
-            return self.yang_module.lower().replace("-", ".")
+        return to_package(self.yang_module, NodeWrapper.prefix)
 
     def subpath(self):
         """
@@ -247,16 +265,18 @@ class Module(NodeWrapper):
         if class_name in self.classes.keys():
             logging.debug("Class already in the list: %s", class_name)
             if len(wrapped_description.children) != len(self.classes[class_name].children):
-                logging.warning("Number of children does not match for %s from stored module %s to new module %s", class_name, self.classes[class_name].yang_module, self.yang_module)
+                logging.warning(
+                    "Number of children mismatch for %s between stored module %s and new module %s",
+                    class_name, self.classes[class_name].yang_module, self.yang_module)
             # print(self.classes[class_name].children.keys())
             old = set(self.classes[class_name].children.keys())
             new = set(wrapped_description.children.keys())
-            #print the different children
-            if old-new!=set():
-                logging.warning(" STORED class %s from module %s has additional children :%s", class_name, self.classes[class_name].yang_module, old - new)
-            if new-old!=set():
-                logging.warning(" NEW class %s from module %s has additional children :%s", class_name, self.yang_module, new - old)
-
+            # print the different children
+            diff = old ^ new
+            if not diff:
+                logging.warning(" Child mismatch for class %s between module %s and %s: %s",
+                                class_name, self.classes[class_name].yang_module, self.yang_module,
+                                diff)
         else:
             self.classes[class_name] = wrapped_description
 
@@ -345,6 +365,8 @@ class BaseType(NodeWrapper):
 """
 alternative class wrapper for bits and bit structure
 """
+
+
 class Bits(NodeWrapper):
     """
     Wrapper class for bits statement
@@ -361,6 +383,7 @@ class Bits(NodeWrapper):
             if stmt.keyword == 'bit':
                 self.bits[stmt.arg] = Bit(stmt, self)
 
+
 class Bit(NodeWrapper):
     """
      Wrapper class for bit values.
@@ -371,6 +394,7 @@ class Bit(NodeWrapper):
         javaname = statement.arg
         javaname = javaname.replace('-', '_').replace('.', '_')
         self.javaname = javaname
+
 
 class Enum(NodeWrapper):
     """
@@ -433,12 +457,8 @@ class Union(NodeWrapper):
                 elif hasattr(stmt, 'i_typedef'):
                     typedef = TypeDef(stmt.i_typedef, self)
                     self.types[to_camelcase(typedef.java_type)] = typedef
-                    if NodeWrapper.prefix:
-                        package = '%s.%s' % (NodeWrapper.prefix, stmt.i_typedef.i_module.arg.lower().replace("-", "."))
-                    else:
-                        package = stmt.i_typedef.i_module.arg.lower().replace("-", ".")
+                    package = to_package(stmt.i_typedef.i_module.arg, NodeWrapper.prefix)
                     self.java_imports.add_import(package, typedef.java_type)
-
 
 
 class TypeDef(Typonder):
@@ -507,7 +527,6 @@ class LeafList(Typonder):
         # else we use a generic list
         else:
             self.java_type = 'List'
-
 
 
 class Grouponder(NodeWrapper):
@@ -595,7 +614,7 @@ class Grouping(Grouponder):
         self.java_type = java_class_name(statement.arg)
         self.java_imports = ImportDict()
         self.java_imports.add_import(self.package(), self.java_type)
-        #add 'case' object as variable when choice substatement exists in grouping
+        # add 'case' object as variable when choice substatement exists in grouping
         for sub_st in statement.substmts:
             if sub_st.keyword == 'choice':
                 for case in sub_st.substmts:
@@ -652,9 +671,9 @@ class Container(Grouponder):
             self.java_type = class_item.java_type
             self.java_imports = class_item.member_imports()
         else:
-            #process exception when statement has i_children but no variables
+            # process exception when statement has i_children but no variables
             if len(statement.i_children) > 0 and len(self.vars) == 0:
-                #adding variables to container class class
+                # adding variables to container class class
                 for child in self.children.values():
                     if child.statement.keyword in ['container', 'grouping', 'list', 'leaf-list']:
                         child.name = child.statement.arg
@@ -681,24 +700,28 @@ class List(Grouponder):
         self.group = 'list'
         self.java_imports = ImportDict()
         self.java_imports.add_import(JAVA_LIST_IMPORTS[0], JAVA_LIST_IMPORTS[1])
-        #check if a super class exists and assign type
+        # check if a super class exists and assign type
         if self.uses:
-            for use in self.uses.values():
-                for child in use.children.values():
-                    child.name = child.statement.arg
-                    java_name = to_camelcase(child.statement.arg)
-                    self.vars[java_name] = child
-
-            # self.java_imports.add_import(self.package(), self.java_type)
-            # self.type = next(iter(self.uses.values()))
-            # self.java_imports.merge(self.type.inheritance_imports())
-        #check for any other childrent not already in the variable list and add them
-        for child_wr in self.children.values():
-            if child_wr not in self.vars.values():
-                child_wr.name = child_wr.statement.arg
-                java_name = to_camelcase(child_wr.statement.arg)
-                self.vars[java_name] = child_wr
+            # multiple inheritance is not supported in Java: importing all variables
+            if len(self.uses) > 1:
+                for use in self.uses.values():
+                    for child in use.children.values():
+                        child.name = child.statement.arg
+                        java_name = to_camelcase(child.statement.arg)
+                        self.vars[java_name] = child
+            # only one super class -> assign type
+            else:
+                self.type = next(iter(self.uses.values()))
+                self.java_imports.merge(self.type.inheritance_imports())
+        # check for any other children not already in the variable list and add them
+        # FIXME: the 'if' might not work correctly
+        # for child_wr in self.children.values():
+        #     if child_wr not in self.vars.values():
+        #         child_wr.name = child_wr.statement.arg
+        #         java_name = to_camelcase(child_wr.statement.arg)
+        #         self.vars[java_name] = child_wr
         # if new variables are defined in the list, a helper class is needed
+        # FIXME: the commented code (previous fixme) breaks this check
         if self.children and 0 < len(self.vars):
             self.element_type = java_class_name(statement.arg) + JAVA_LIST_CLASS_APPENDIX
             self.top().add_class(self.element_type, self)
@@ -728,7 +751,7 @@ class Case(Grouponder):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.java_imports = ImportDict()
-        self.java_type = java_class_name(self.statement.arg)+ 'CaseType'
+        self.java_type = java_class_name(self.statement.arg) + 'CaseType'
         self.top().add_class(self.java_type, self)
         self.java_imports.add_import(self.package(), self.java_type)
 

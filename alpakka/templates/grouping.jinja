@@ -17,7 +17,7 @@ import {{ import }};
 {%- endif %}
 {{ class_description(ctx.description) }}
 @JsonInclude(Include.NON_NULL)
-public class {{ name }} {% if ctx.uses==1 %}extends {{ ctx.uses.keys() | first }} {% endif %}implements Serializable {
+public class {{ name }} {% if ctx.uses|length == 1 %}extends {{ ctx.uses.keys() | first }} {% endif %}implements Serializable {
 
   private static final long serialVersionUID = 1L;
 {% for key, var in ctx.vars.items() %}
@@ -27,7 +27,7 @@ public class {{ name }} {% if ctx.uses==1 %}extends {{ ctx.uses.keys() | first }
 
   @JsonCreator
   public {{ name }} (
-    {%- if ctx.uses==1 -%}
+    {%- if ctx.uses|length == 1 -%}
     {% for key, var in ctx.inherited_vars().items() -%}
       @JsonProperty("{{ var.name }}") {{ var.java_type }} {{ key }}{% if not loop.last -%},
     {% endif %}
@@ -37,7 +37,7 @@ public class {{ name }} {% if ctx.uses==1 %}extends {{ ctx.uses.keys() | first }
     {%- if not loop.last -%},
     {% endif %}
     {%- endfor %}){
-    {%- if ctx.uses==1 %}
+    {%- if ctx.uses|length == 1 %}
     super({% for key in ctx.inherited_vars().keys() %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %});{% endif -%}
     {%- for key, var in ctx.vars.items() %}
     this.{{ key }} = {{ key }}

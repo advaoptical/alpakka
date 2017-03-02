@@ -11,11 +11,17 @@ from alpakka.wrapper import wrap_module, nodewrapper
 def firstupper(value):
     """
     Makes the first letter of the value upper case without touching the rest of the string.
+    In case the value starts with an '_' it is removed and the following letter is made upper case.
     :param value: the string to be processed
     :return: the value with a upper case first letter
     """
     first = value[0] if len(value) > 0 else ''
-    remaining = value[1:] if len(value) > 1 else ''
+    # special treatment for underscore
+    if '_' in first:
+        first = value[1] if len(value) > 1 else ''
+        remaining = value[2:] if len(value) > 2 else ''
+    else:
+        remaining = value[1:] if len(value) > 1 else ''
     return first.upper() + remaining
 
 
