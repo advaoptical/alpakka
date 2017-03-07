@@ -273,7 +273,7 @@ class Module(NodeWrapper):
             new = set(wrapped_description.children.keys())
             # print the different children
             diff = old ^ new
-            if not diff:
+            if diff:
                 logging.warning(" Child mismatch for class %s between module %s and %s: %s",
                                 class_name, self.classes[class_name].yang_module, self.yang_module,
                                 diff)

@@ -167,5 +167,5 @@ class AkkaPlugin(plugin.PyangPlugin):
             # print the output for debugging
             logging.debug(output)
             # write to file
-            with open("%s/%s.java" % (output_path, key), 'w') as f:
+            with open("%s/%s.java" % (output_path, key), 'w', encoding="utf-8", newline="\n") as f:
                 f.write(output)
