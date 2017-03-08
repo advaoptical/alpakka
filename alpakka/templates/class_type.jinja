@@ -5,6 +5,8 @@ import java.util.Objects;
 
 import java.io.Serializable;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 {{ class_description(ctx.description) }}
 public class {{ name }} implements Serializable {
 {% set varname = name | firstlower %}
@@ -16,6 +18,7 @@ public class {{ name }} implements Serializable {
     this.{{ varname }} = {{ varname }};
   }
 
+  @JsonValue
   public {{ type }} get{{ name }}(){
     return {{ varname }};
   }
