@@ -15,14 +15,8 @@ def firstupper(value):
     :param value: the string to be processed
     :return: the value with a upper case first letter
     """
-    first = value[0] if len(value) > 0 else ''
-    # special treatment for underscore
-    if '_' in first:
-        first = value[1] if len(value) > 1 else ''
-        remaining = value[2:] if len(value) > 2 else ''
-    else:
-        remaining = value[1:] if len(value) > 1 else ''
-    return first.upper() + remaining
+    value = value.lstrip('_')
+    return value and value[0].upper() + value[1:]
 
 
 def firstlower(value):
@@ -31,9 +25,7 @@ def firstlower(value):
     :param value: the string to be processed
     :return: the value with a lower case first letter
     """
-    first = value[0] if len(value) > 0 else ''
-    remaining = value[1:] if len(value) > 1 else ''
-    return first.lower() + remaining
+    return value and value[0].lower() + value[1:]
 
 
 def pyang_plugin_init():
