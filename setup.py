@@ -9,6 +9,7 @@ setup(
 
     packages=[
         'alpakka',
+        'alpakka.wrapper',
         'alpakka.pyang_plugins',
     ],
     entry_points={
