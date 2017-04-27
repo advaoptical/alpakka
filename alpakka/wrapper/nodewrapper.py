@@ -37,7 +37,8 @@ JAVA_WRAPPER_CLASSES = {
 
 class ImportDict:
     """
-    Class that is used to store imports. It wraps a dictionary and stores the classes per package.
+    Class that is used to store imports.
+    It wraps a dictionary and stores the classes per package.
     This makes it easier to filter imports that are part of a package.
     """
 
@@ -112,7 +113,9 @@ def to_camelcase(string):
     :return: camel case representation of the string
     """
     name = string[0].lower() + string[1:]
-    name = re.sub(r'[-](?P<first>[a-zA-Z])', lambda m: m.group('first').upper(), name)
+    name = re.sub(r'[-](?P<first>[a-zA-Z])',
+                  lambda m: m.group('first').upper(),
+                  name)
     # check if the name is a reserved word and prepend '_'
     if name in JAVA_RESERVED_WORDS:
         return '_%s' % name
@@ -122,8 +125,8 @@ def to_camelcase(string):
 
 def to_package(string, prefix=None):
     """
-    Converts the string to a package name by making it lower case, replacing '-' with '.' and
-    adding a prefix if available.
+    Converts the string to a package name by making it lower case,
+    replacing '-' with '.' and adding a prefix if available.
     :param string: the string to be converted
     :param prefix: the prefix for the package
     :return: package name
@@ -165,7 +168,8 @@ class NodeWrapper:
                 else:
                     self.children[child.arg] = child_wrapper(child, self)
             else:
-                logging.info("No wrapper for yang type: %s (%s)" % (child.keyword, child.arg))
+                logging.info("No wrapper for yang type: %s (%s)" %
+                             (child.keyword, child.arg))
         # statements that might be available in general
         for stmt in statement.substmts:
             # store the description if available
@@ -195,7 +199,8 @@ class NodeWrapper:
 
     def top(self):
         """
-        Find the root wrapper object by walking the tree recursively to the top.
+        Find the root wrapper object by walking the tree recursively
+        to the top.
         :return: the root node
         """
         if self.parent:
@@ -264,19 +269,24 @@ class Module(NodeWrapper):
         # TODO: might need additional processing
         if class_name in self.classes.keys():
             logging.debug("Class already in the list: %s", class_name)
-            if len(wrapped_description.children) != len(self.classes[class_name].children):
+            if len(wrapped_description.children) != len(
+                    self.classes[class_name].children
+            ):
                 logging.warning(
-                    "Number of children mismatch for %s between stored module %s and new module %s",
-                    class_name, self.classes[class_name].yang_module, self.yang_module)
+                    "Number of children mismatch for %s between stored "
+                    "module %s and new module %s",
+                    class_name, self.classes[class_name].yang_module,
+                    self.yang_module)
             # print(self.classes[class_name].children.keys())
             old = set(self.classes[class_name].children.keys())
             new = set(wrapped_description.children.keys())
             # print the different children
             diff = old ^ new
             if diff:
-                logging.warning(" Child mismatch for class %s between module %s and %s: %s",
-                                class_name, self.classes[class_name].yang_module, self.yang_module,
-                                diff)
+                logging.warning(
+                    "Child mismatch for class %s between module %s and %s: %s",
+                    class_name, self.classes[class_name].yang_module,
+                    self.yang_module, diff)
         else:
             self.classes[class_name] = wrapped_description
 
@@ -323,8 +333,8 @@ class Typonder(NodeWrapper):
                 if stmt.arg == 'enumeration':
                     self.type = Enumeration(stmt, self)
                 # is the statement a base type
-                elif any(re.match(r'^%s$' % pattern, stmt.arg) for pattern, _ in
-                         TYPE_PATTERNS_TO_JAVA):
+                elif any(re.match(r'^%s$' % pattern, stmt.arg)
+                         for pattern, _ in TYPE_PATTERNS_TO_JAVA):
                     self.type = BaseType(stmt, self)
                 # is the statement a union
                 elif stmt.arg == 'union':
@@ -342,7 +352,8 @@ class Typonder(NodeWrapper):
 
     def member_imports(self):
         """
-        :return: Imports that are needed for this type if it is a member of a class.
+        :return: Imports that are needed for this type if it is a member of a
+                 class.
         """
         return self.type.java_imports
 
@@ -419,7 +430,8 @@ class Enumeration(NodeWrapper):
         super().__init__(statement, parent)
         self.java_imports = ImportDict()
         self.java_type = java_class_name(self.statement.arg)
-        self.java_imports.add_import(self.package(), java_class_name(self.parent.statement.arg))
+        self.java_imports.add_import(
+            self.package(), java_class_name(self.parent.statement.arg))
         self.enums = OrderedDict()
         self.group = 'enum'
         # loop through substatements and extract the enum values
@@ -457,7 +469,8 @@ class Union(NodeWrapper):
                 elif hasattr(stmt, 'i_typedef'):
                     typedef = TypeDef(stmt.i_typedef, self)
                     self.types[to_camelcase(typedef.java_type)] = typedef
-                    package = to_package(stmt.i_typedef.i_module.arg, NodeWrapper.prefix)
+                    package = to_package(stmt.i_typedef.i_module.arg,
+                                         NodeWrapper.prefix)
                     self.java_imports.add_import(package, typedef.java_type)
 
 
@@ -501,7 +514,8 @@ class LeafRef(NodeWrapper):
         super().__init__(statement, parent)
         self.java_imports = ImportDict()
         type_spec = statement.i_type_spec
-        # The target is defined in the module tree but might not be for unused groupings.
+        # The target is defined in the module tree but might not be for
+        # unused groupings.
         if hasattr(type_spec, 'i_target_node'):
             self.group = 'ref'
             self.reference = Leaf(type_spec.i_target_node, self)
@@ -517,7 +531,8 @@ class LeafList(Typonder):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.java_imports = ImportDict()
-        self.java_imports.add_import(JAVA_LIST_IMPORTS[0], JAVA_LIST_IMPORTS[1])
+        self.java_imports.add_import(
+            JAVA_LIST_IMPORTS[0], JAVA_LIST_IMPORTS[1])
         self.group = 'list'
         # if the type of the list elements is defined
         if hasattr(self, 'type') and hasattr(self.type, 'java_type'):
@@ -570,7 +585,8 @@ class Grouponder(NodeWrapper):
 
     def inherited_vars(self):
         """
-        Collects a dictionary of inherited variables that are needed for super calls.
+        Collects a dictionary of inherited variables that are needed for
+        super calls.
         :return: dictionary of inherited variables
         """
         result = OrderedDict()
@@ -598,7 +614,8 @@ class Grouponder(NodeWrapper):
         for var in self.vars.values():
             # checking if there is at least one list defined in the grouponder
             if hasattr(var, 'group') and var.group == 'list':
-                imports.add_import(JAVA_LIST_INSTANCE_IMPORTS[0], JAVA_LIST_INSTANCE_IMPORTS[1])
+                imports.add_import(JAVA_LIST_INSTANCE_IMPORTS[0],
+                                   JAVA_LIST_INSTANCE_IMPORTS[1])
                 break
         return imports.get_imports()
 
@@ -614,7 +631,8 @@ class Grouping(Grouponder):
         self.java_type = java_class_name(statement.arg)
         self.java_imports = ImportDict()
         self.java_imports.add_import(self.package(), self.java_type)
-        # add 'case' object as variable when choice substatement exists in grouping
+        # add 'case' object as variable when choice substatement exists in
+        # grouping
         for sub_st in statement.substmts:
             if sub_st.keyword == 'choice':
                 for case in sub_st.substmts:
@@ -665,7 +683,8 @@ class Container(Grouponder):
                 self.vars[java_name] = ch_wrapper
                 self.top().add_class(self.java_type, self)
                 self.java_imports.add_import(self.package(), self.java_type)
-        # containers that just import a grouping don't need a new class -> variable
+        # containers that just import a grouping don't need a new class
+        # -> variable
         elif len(self.uses) == 1 and len(self.vars) == 0:
             class_item = next(iter(self.uses.values()))
             self.java_type = class_item.java_type
@@ -675,7 +694,9 @@ class Container(Grouponder):
             if len(statement.i_children) > 0 and len(self.vars) == 0:
                 # adding variables to container class class
                 for child in self.children.values():
-                    if child.statement.keyword in ['container', 'grouping', 'list', 'leaf-list']:
+                    if child.statement.keyword in [
+                            'container', 'grouping', 'list', 'leaf-list',
+                    ]:
                         child.name = child.statement.arg
                         java_name = to_camelcase(child.name)
                         self.vars[java_name] = child
@@ -699,10 +720,12 @@ class List(Grouponder):
         super().__init__(statement, parent)
         self.group = 'list'
         self.java_imports = ImportDict()
-        self.java_imports.add_import(JAVA_LIST_IMPORTS[0], JAVA_LIST_IMPORTS[1])
+        self.java_imports.add_import(JAVA_LIST_IMPORTS[0],
+                                     JAVA_LIST_IMPORTS[1])
         # check if a super class exists and assign type
         if self.uses:
-            # multiple inheritance is not supported in Java: importing all variables
+            # multiple inheritance is not supported in Java:
+            # importing all variables
             if len(self.uses) > 1:
                 for use in self.uses.values():
                     for child in use.children.values():
@@ -713,7 +736,8 @@ class List(Grouponder):
             else:
                 self.type = next(iter(self.uses.values()))
                 self.java_imports.merge(self.type.inheritance_imports())
-        # check for any other children not already in the variable list and add them
+        # check for any other children not already in the variable list and
+        # add them
         # FIXME: the 'if' might not work correctly
         # for child_wr in self.children.values():
         #     if child_wr not in self.vars.values():
@@ -723,7 +747,8 @@ class List(Grouponder):
         # if new variables are defined in the list, a helper class is needed
         # FIXME: the commented code (previous fixme) breaks this check
         if self.children and 0 < len(self.vars):
-            self.element_type = java_class_name(statement.arg) + JAVA_LIST_CLASS_APPENDIX
+            self.element_type = (java_class_name(statement.arg) +
+                                 JAVA_LIST_CLASS_APPENDIX)
             self.top().add_class(self.element_type, self)
             self.java_type = 'List<%s>' % self.element_type
             self.java_imports.add_import(self.package(), self.element_type)
