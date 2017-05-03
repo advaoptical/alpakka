@@ -1,0 +1,3 @@
+[python]
+bears = PEP8Bear, PycodestyleBear, PyFlakesBear
+files = **.py

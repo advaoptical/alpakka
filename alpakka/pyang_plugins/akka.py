@@ -10,8 +10,10 @@ from alpakka.wrapper import wrap_module, nodewrapper
 
 def firstupper(value):
     """
-    Makes the first letter of the value upper case without touching the rest of the string.
-    In case the value starts with an '_' it is removed and the following letter is made upper case.
+    Makes the first letter of the value upper case without touching
+    the rest of the string.
+    In case the value starts with an '_' it is removed and the following letter
+    is made upper case.
     :param value: the string to be processed
     :return: the value with a upper case first letter
     """
@@ -21,7 +23,8 @@ def firstupper(value):
 
 def firstlower(value):
     """
-    Makes the first letter of the value lower case without touching the rest of the string.
+    Makes the first letter of the value lower case without touching
+    the rest of the string.
     :param value: the string to be processed
     :return: the value with a lower case first letter
     """
@@ -57,21 +60,19 @@ class AkkaPlugin(plugin.PyangPlugin):
         :param optparser: the option parser
         """
         options = [
-            optparse.make_option("--akka-output-path",
-                                 dest="akka_output",
-                                 action="store",
-                                 help="output path for the generated classes"
-                                 ),
-            optparse.make_option("--akka-package-prefix",
-                                 dest="akka_prefix",
-                                 action="store",
-                                 help="package prefix to be prepended to the generated classes"
-                                 ),
-            optparse.make_option("--akka-beans-only",
-                                 action="store_true",
-                                 dest="beans_only",
-                                 default=False,
-                                 help="create just the beans without the akka classes")
+            optparse.make_option(
+                "--akka-output-path", dest="akka_output", action="store",
+                help="output path for the generated classes"
+            ),
+            optparse.make_option(
+                "--akka-package-prefix", dest="akka_prefix", action="store",
+                help="package prefix to be prepended to the generated classes"
+            ),
+            optparse.make_option(
+                "--akka-beans-only", action="store_true", dest="beans_only",
+                default=False,
+                help="create just the beans without the akka classes"
+            ),
         ]
         group = optparser.add_option_group("Akka output specific options")
         group.add_options(options)
@@ -79,19 +80,22 @@ class AkkaPlugin(plugin.PyangPlugin):
     def emit(self, ctx, modules, writef):
         self.get_options(ctx)
         unique_modules = set()
-        # collect set of unique modules, avoid wrapping the same one multiple times
+        # collect set of unique modules, avoid wrapping the same one
+        # multiple times
         for module in modules:
             for module_details, context_module in module.i_ctx.modules.items():
                 unique_modules.add(context_module)
         # wrap unique modules
         for module in unique_modules:
             if module.i_children:
-                logging.info("Wrapping module %s (%s)", module.arg, module.i_latest_revision)
+                logging.info("Wrapping module %s (%s)",
+                             module.arg, module.i_latest_revision)
                 # wrap module statement
                 wrapped_module = wrap_module(module)
                 self.generate_classes(wrapped_module)
             else:
-                logging.info("No children in module %s (%s)", module.arg, module.i_latest_revision)
+                logging.info("No children in module %s (%s)",
+                             module.arg, module.i_latest_revision)
 
     def get_options(self, ctx):
         """
@@ -120,8 +124,9 @@ class AkkaPlugin(plugin.PyangPlugin):
         if not self.beans_only:
             # generate routes for the data tree
             self.fill_template('tree.jinja', {'Tree': module})
-            #generate empty xml_config template for NETCONF use
-            self.fill_template('empty_config.jinja', {'empty_XML_config': module})
+            # generate empty xml_config template for NETCONF use
+            self.fill_template('empty_config.jinja',
+                               {'empty_XML_config': module})
             # run only if rpcs are available
             if module.rpcs:
                 if_name = '%sInterface' % module.java_name
@@ -131,11 +136,13 @@ class AkkaPlugin(plugin.PyangPlugin):
                 rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports,
                             'package': module.package(),
                             'path': module.subpath()}
-                self.fill_template('backend_interface.jinja', {if_name: rpc_dict})
+                self.fill_template('backend_interface.jinja',
+                                   {if_name: rpc_dict})
                 rpc_dict['interface_name'] = if_name
                 self.fill_template('backend_impl.jinja',
                                    {'%sBackend' % module.java_name: rpc_dict})
-                self.fill_template('routes.jinja', {'%sRoutes' % module.java_name: rpc_dict})
+                self.fill_template('routes.jinja',
+                                   {'%sRoutes' % module.java_name: rpc_dict})
 
     def fill_template(self, template_name, description_dict):
         """
@@ -159,5 +166,6 @@ class AkkaPlugin(plugin.PyangPlugin):
             # print the output for debugging
             logging.debug(output)
             # write to file
-            with open("%s/%s.java" % (output_path, key), 'w', encoding="utf-8", newline="\n") as f:
+            with open("%s/%s.java" % (output_path, key), 'w', encoding="utf-8",
+                      newline="\n") as f:
                 f.write(output)

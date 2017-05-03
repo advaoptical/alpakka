@@ -1,0 +1,4 @@
+coala:
+  image: coala/base
+  script:
+    - coala --ci
