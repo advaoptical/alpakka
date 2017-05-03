@@ -2,3 +2,11 @@ coala:
   image: coala/base
   script:
     - coala --ci
+
+pytest:
+  image: python:3.6
+  script:
+    - pip install -U pip setuptools
+    - pip install -e .
+    - pip install -r requirements.test.txt
+    - py.test -vv alpakka --cov --doctest-modules

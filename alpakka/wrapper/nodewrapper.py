@@ -2,6 +2,7 @@ import logging
 import re
 from collections import OrderedDict
 
+
 # configuration for logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
@@ -38,8 +39,37 @@ JAVA_WRAPPER_CLASSES = {
 class ImportDict:
     """
     Class that is used to store imports.
-    It wraps a dictionary and stores the classes per package.
+
+    It wraps a dictionary and stores the classes per package as sets.
     This makes it easier to filter imports that are part of a package.
+
+    >>> impdict = ImportDict()
+    >>> impdict.add_import('package', 'Class')
+    >>> impdict.imports
+    {'package': {'Class'}}
+    >>> impdict.get_imports()
+    {'package.Class'}
+
+    Newly added imports are merged into the existing ones:
+
+    >>> impdict.add_import('package', 'Clazz')
+    >>> sorted(impdict.imports['package'])
+    ['Class', 'Clazz']
+    >>> sorted(impdict.get_imports())
+    ['package.Class', 'package.Clazz']
+
+    You can also merge an ``ImportDict`` with another one:
+
+    >>> other = ImportDict()
+    >>> other.add_import('package', 'Class')
+    >>> other.add_import('package', 'Klass')
+    >>> other.add_import('fancy.package', 'Klazz')
+
+    >>> impdict.merge(other)
+    >>> sorted(impdict.imports.keys())
+    ['fancy.package', 'package']
+    >>> sorted(impdict.get_imports())
+    ['fancy.package.Klazz', 'package.Class', 'package.Clazz', 'package.Klass']
     """
 
     def __init__(self):
@@ -49,68 +79,84 @@ class ImportDict:
     def add_import(self, package, clazz):
         """
         Adds an import.
-        :param package: the package of the import
-        :param clazz: the class of the import
+
+        :param package: the package name of the import
+        :param clazz: the class name of the import
         """
-        if package in self.imports:
-            self.imports[package].add(clazz)
-        else:
-            self.imports[package] = {clazz}
+        self.imports.setdefault(package, set()).add(clazz)
 
     def merge(self, other):
         """
         Merges another dictionary into this one.
-        :param other: the dict to be merged
+
+        :param other: the :class:`ImportDict` instance to be merged
         """
         for package, classes in other.imports.items():
-            if package not in self.imports:
-                self.imports[package] = set()
-            self.imports[package] |= classes
+            pkgclasses = self.imports.setdefault(package, set())
+            pkgclasses |= classes
 
     def get_imports(self):
         """
         Converts the managed imports into a set of imports.
-        :return: a set of import strings
+
+        :return: a ``set`` of fully qualified import strings
         """
-        imports = set()
-        for package, classes in self.imports.items():
-            for cls in classes:
-                imports.add('%s.%s' % (package, cls))
-        return imports
+        return {'%s.%s' % (pkg, cls) for pkg, classes in self.imports.items()
+                for cls in classes}
 
 
 def type_to_java(yang):
     """
     Converts built-in YANG types to the corresponding Java types.
 
+    If no mapping is available, a ``ValueError`` is raised.
+
     :param yang: input YANG type string
-    :return: Java type string or None
+    :return: Java type string
+
+    >>> type_to_java('int32')
+    'int'
+    >>> type_to_java('uint16')
+    'int'
+    >>> type_to_java('empty')
+    'Object'
+
+    >>> type_to_java('invalid')
+    Traceback (most recent call last):
+      ...
+    ValueError: No Java type mapping for 'invalid'
     """
     for pattern, java in TYPE_PATTERNS_TO_JAVA:
         if re.match(r'^%s$' % pattern, yang):
             return java
-    raise ValueError("No Java type mapping for %s" % yang)
+
+    raise ValueError("No Java type mapping for %s" % repr(yang))
 
 
 def java_class_name(name):
     """
     Cleanup for names that need to follow Java class name restrictions.
     Add any further processing here.
+
     :param name: the name to be cleaned up
     :return: class name following Java convention
+
+    >>> java_class_name('some-type')
+    'SomeType'
     """
-    class_name = name.capitalize()
-    class_name = class_name.replace("-", " ").title()
-    return class_name.replace(" ", "")
+    return name.capitalize().replace("-", " ").title().replace(" ", "")
 
 
 def to_camelcase(string):
     """
     Creates a camel case representation by removing hyphens.
     The first letter is lower case everything else remains untouched.
-    Example: Hello-world -> helloWorld
+
     :param string: string to be processed
     :return: camel case representation of the string
+
+    >>> to_camelcase('Hello-world')
+    'helloWorld'
     """
     name = string[0].lower() + string[1:]
     name = re.sub(r'[-](?P<first>[a-zA-Z])',
@@ -118,7 +164,7 @@ def to_camelcase(string):
                   name)
     # check if the name is a reserved word and prepend '_'
     if name in JAVA_RESERVED_WORDS:
-        return '_%s' % name
+        return '_' + name
     else:
         return name
 
@@ -127,9 +173,16 @@ def to_package(string, prefix=None):
     """
     Converts the string to a package name by making it lower case,
     replacing '-' with '.' and adding a prefix if available.
+
     :param string: the string to be converted
     :param prefix: the prefix for the package
     :return: package name
+
+    >>> to_package('yang-module')
+    'yang.module'
+
+    >>> to_package('yang-module', 'fancy')
+    'fancy.yang.module'
     """
     package = string.lower().replace("-", ".")
     if prefix:
@@ -149,13 +202,10 @@ class NodeWrapper:
         self.parent = parent
         self.children = {}
         # the yang module name
-        if self.statement.top:
-            self.yang_module = self.statement.top.i_modulename
-        else:
-            self.yang_module = self.statement.i_modulename
+        self.yang_module = (self.statement.top or self.statement).i_modulename
         # wrap all children of the node
         for child in getattr(statement, 'i_children', []):
-            child_wrapper = YANG_NODE_TO_WRAPPER.get(child.keyword, None)
+            child_wrapper = YANG_NODE_TO_WRAPPER.get(child.keyword)
             if child_wrapper:
                 # START of special handling for choice statements:
                 if child.keyword == 'choice':
@@ -227,6 +277,7 @@ class Module(NodeWrapper):
     def enums(self):
         """
         Extracts the enumeration definitions from the typedefs.
+
         :return: dictionary of enums
         """
         return {name: data for name, data in self.typedefs.items()
@@ -235,6 +286,7 @@ class Module(NodeWrapper):
     def base_extensions(self):
         """
         Extracts extension of base types from the typedefs.
+
         :return: dictionary of base type extensions
         """
         return {name: data for name, data in self.typedefs.items()
@@ -243,6 +295,7 @@ class Module(NodeWrapper):
     def types(self):
         """
         Extracts extension of defined types from the typedefs.
+
         :return: dictionary of type extensions
         """
         return {name: data for name, data in self.typedefs.items()
@@ -251,6 +304,7 @@ class Module(NodeWrapper):
     def unions(self):
         """
         Extracts all unions from the typedefs.
+
         :return:  dictionary of unions
         """
         return {name: data for name, data in self.typedefs.items()
@@ -263,6 +317,7 @@ class Module(NodeWrapper):
     def add_class(self, class_name, wrapped_description):
         """
         Add a class to the collection that needs to be generated.
+
         :param class_name: the class name to be used
         :param wrapped_description: the wrapped node description
         """
@@ -293,6 +348,7 @@ class Module(NodeWrapper):
     def del_class(self, class_name):
         """
         Deletes a class from the collection.
+
         :param class_name: the class to be removed
         """
         self.classes.pop(class_name)
@@ -300,6 +356,7 @@ class Module(NodeWrapper):
     def add_rpc(self, rpc_name, wrapped_description):
         """
         Add an RPC that needs to be generated.
+
         :param rpc_name: the name of the RPC
         :param wrapped_description:  the wrapped node description
         """
@@ -308,6 +365,7 @@ class Module(NodeWrapper):
     def add_typedef(self, typedef_name, wrapped_description):
         """
         Add a type definition that needs to be generated.
+
         :param typedef_name: the name of the type definition
         :param wrapped_description: the wrapped node description
         """
@@ -323,6 +381,7 @@ class Typonder(NodeWrapper):
     def __init__(self, statement, parent):
         """
         Constructor for a typonder that results in a type property.
+
         :param statement: the statement to be wrapped
         :param parent: the wrapper of the parent statement
         """
@@ -647,7 +706,8 @@ class Grouping(Grouponder):
         if not self.vars:
             if len(self.uses) == 1:
                 return next(self.uses.keys())
-        return None
+        else:
+            return None
 
     def inheritance_imports(self):
         """
@@ -763,6 +823,7 @@ class List(Grouponder):
 
 
 class Choice(Grouponder):
+
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         # self.java_imports = ImportDict()
@@ -773,6 +834,7 @@ class Choice(Grouponder):
 
 
 class Case(Grouponder):
+
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.java_imports = ImportDict()
@@ -785,14 +847,12 @@ class Input(Grouponder):
     """
     Parser for input nodes.
     """
-    pass
 
 
 class Output(Grouponder):
     """
     Parser for output nodes.
     """
-    pass
 
 
 class RPC(NodeWrapper):
