@@ -8,6 +8,12 @@ from alpakka.templates import template_var
 # configuration for logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
+
+# registry for derived NodeWrapper classes, automagically filled by
+# NodeWrapperMeta
+YANG_NODE_TO_WRAPPER = {}
+
+
 # appendix indicating a list type class
 JAVA_LIST_CLASS_APPENDIX = 'ListType'
 
@@ -192,9 +198,39 @@ def to_package(string, prefix=None):
     return package
 
 
-class NodeWrapper:
+class NodeWrapperMeta(type):
+    """
+    Metaclass for :class:`NodeWrapper`
+
+    Allows to add the YANG node name to the definition of a derived class,
+    which automagically registers that class in ``YANG_NODE_TO_WRAPPER``
+
+    See :class:`NodeWrapper` for usage examples
+    """
+
+    def __new__(mcs, clsname, bases, clsattrs, *args, yang=None):
+        return type.__new__(mcs, clsname, bases, clsattrs, *args)
+
+    def __init__(cls, clsname, bases, clsattrs, *args, yang=None):
+        type.__init__(cls, clsname, bases, clsattrs, *args)
+        if yang:
+            YANG_NODE_TO_WRAPPER[yang] = cls
+
+
+class NodeWrapper(metaclass=NodeWrapperMeta):
     """
     Base class for node wrappers. It includes the base setup.
+
+    If a derived classes directly maps to a YANG node, its name can be given
+    as additional keyword-only argument to the class definition:
+
+    >>> class SomeNode(NodeWrapper, yang='some-node'):
+    ...     pass
+
+    This will automagically register that class in ``YANG_NODE_TO_WRAPPER``:
+
+    >>> YANG_NODE_TO_WRAPPER['some-node']
+    <class 'alpakka.wrapper.nodewrapper.SomeNode'>
     """
     prefix = ""
 
@@ -430,7 +466,7 @@ class Typonder(NodeWrapper):
 
 class BaseType(NodeWrapper):
     """
-     Wrapper class for a java base types, like boolean, double, int and String.
+    Wrapper class for a java base types, like boolean, double, int and String.
     """
 
     def __init__(self, statement, parent):
@@ -465,9 +501,9 @@ class Bits(NodeWrapper):
                 self.bits[stmt.arg] = Bit(stmt, self)
 
 
-class Bit(NodeWrapper):
+class Bit(NodeWrapper, yang='bit'):
     """
-     Wrapper class for bit values.
+    Wrapper class for bit values.
     """
 
     def __init__(self, statement, parent):
@@ -477,9 +513,9 @@ class Bit(NodeWrapper):
         self.javaname = javaname
 
 
-class Enum(NodeWrapper):
+class Enum(NodeWrapper, yang='enum'):
     """
-     Wrapper class for enum values.
+    Wrapper class for enum values.
     """
 
     def __init__(self, statement, parent):
@@ -545,7 +581,7 @@ class Union(NodeWrapper):
                     self.java_imports.add_import(package, typedef.java_type)
 
 
-class TypeDef(Typonder):
+class TypeDef(Typonder, yang='typedef'):
     """
     Wrapper class for type definition statements.
     """
@@ -564,7 +600,7 @@ class TypeDef(Typonder):
             self.java_imports.add_import(self.package(), self.java_type)
 
 
-class Leaf(Typonder):
+class Leaf(Typonder, yang='leaf'):
     """
     Wrapper class for type definition statements.
     """
@@ -594,7 +630,7 @@ class LeafRef(NodeWrapper):
             self.java_imports.merge(self.reference.java_imports)
 
 
-class LeafList(Typonder):
+class LeafList(Typonder, yang='leaf-list'):
     """
     Wrapper class for leaf list statements.
     """
@@ -626,33 +662,27 @@ class Grouponder(NodeWrapper):
         self.uses = OrderedDict()
         # find all available variables in the sub-statements
         for stmt in statement.substmts:
-            keyword = stmt.keyword
-            result = None
-            # go through the supported variable types
-            if keyword == 'leaf':
-                result = Leaf(stmt, self)
-            elif keyword == 'leaf-list':
-                result = LeafList(stmt, self)
-            elif keyword == 'grouping':
-                result = Grouping(stmt, self)
-            elif keyword == 'list':
-                result = List(stmt, self)
-            elif keyword == 'container':
-                result = Container(stmt, self)
-            elif stmt.keyword == 'uses':
+            if stmt.keyword == 'uses':
                 # class name for the import
                 class_name = java_class_name(stmt.i_grouping.arg)
                 # add the grouping to the list of super classes
                 self.uses[class_name] = Grouping(stmt.i_grouping, self)
                 self.top().add_class(class_name, self.uses[class_name])
-            # if a result is available add it to the variables
-            if result is not None:
-                # store the yang name
-                result.name = stmt.arg
-                # remove leading underscores from the name
-                java_name = re.sub(r'^_', '', stmt.arg)
-                java_name = to_camelcase(java_name)
-                self.vars[java_name] = result
+                continue
+
+            # find a node wrapper for supported variable types
+            child_wrapper = YANG_NODE_TO_WRAPPER.get(stmt.keyword)
+            if not child_wrapper:
+                logging.info("No wrapper for yang type: %s (%s)" %
+                             (stmt.keyword, stmt.arg))
+                continue
+
+            result = child_wrapper(stmt, self)
+            result.name = stmt.arg
+            # remove leading underscores from the name
+            java_name = re.sub(r'^_', '', stmt.arg)
+            java_name = to_camelcase(java_name)
+            self.vars[java_name] = result
 
     @template_var
     def inherited_vars(self):
@@ -693,7 +723,7 @@ class Grouponder(NodeWrapper):
         return imports.get_imports()
 
 
-class Grouping(Grouponder):
+class Grouping(Grouponder, yang='grouping'):
     """
     Wrapper class for grouping statements.
     """
@@ -736,7 +766,7 @@ class Grouping(Grouponder):
         return self.java_imports
 
 
-class Container(Grouponder):
+class Container(Grouponder, yang='container'):
     """
     Wrapper class for container statements.
     """
@@ -789,7 +819,7 @@ class Container(Grouponder):
         return self.java_imports
 
 
-class List(Grouponder):
+class List(Grouponder, yang='list'):
     """
     Wrapper class for list statements.
     """
@@ -840,7 +870,7 @@ class List(Grouponder):
                 self.java_type = 'List'
 
 
-class Choice(Grouponder):
+class Choice(Grouponder, yang='choice'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
@@ -851,7 +881,7 @@ class Choice(Grouponder):
         #     self.java_imports.add_import(child.package(), child.java_type)
 
 
-class Case(Grouponder):
+class Case(Grouponder, yang='case'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
@@ -861,19 +891,19 @@ class Case(Grouponder):
         self.java_imports.add_import(self.package(), self.java_type)
 
 
-class Input(Grouponder):
+class Input(Grouponder, yang='input'):
     """
     Parser for input nodes.
     """
 
 
-class Output(Grouponder):
+class Output(Grouponder, yang='output'):
     """
     Parser for output nodes.
     """
 
 
-class RPC(NodeWrapper):
+class RPC(NodeWrapper, yang='rpc'):
     """
     Parser for RPC nodes.
     """
@@ -894,18 +924,3 @@ class RPC(NodeWrapper):
         #         return self.input.interface_imports()
         #     else:
         #         return set()
-
-
-YANG_NODE_TO_WRAPPER = {
-    "container": Container,
-    "typedef": TypeDef,
-    "rpc": RPC,
-    "grouping": Grouping,
-    "list": List,
-    "leaf": Leaf,
-    "input": Input,
-    "output": Output,
-    "leaf-list": LeafList,
-    "choice": Choice,
-    "case": Case,
-}
