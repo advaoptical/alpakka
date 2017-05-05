@@ -2,6 +2,8 @@ import logging
 import re
 from collections import OrderedDict
 
+from alpakka.templates import template_var
+
 
 # configuration for logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
@@ -229,6 +231,7 @@ class NodeWrapper:
             elif stmt.keyword == 'config':
                 self.config = statement.arg.lower() == 'true'
 
+    @template_var
     def package(self):
         """
         The pakackage name of this module.
@@ -236,6 +239,7 @@ class NodeWrapper:
         """
         return to_package(self.yang_module, NodeWrapper.prefix)
 
+    @template_var
     def subpath(self):
         """
         The subpath of this module.
@@ -247,6 +251,7 @@ class NodeWrapper:
         else:
             return self.yang_module.lower().replace("-", "/")
 
+    @template_var
     def top(self):
         """
         Find the root wrapper object by walking the tree recursively
@@ -274,6 +279,7 @@ class Module(NodeWrapper):
         # store the java name of the module
         self.java_name = java_class_name(statement.i_prefix)
 
+    @template_var
     def enums(self):
         """
         Extracts the enumeration definitions from the typedefs.
@@ -283,6 +289,7 @@ class Module(NodeWrapper):
         return {name: data for name, data in self.typedefs.items()
                 if data.type.group == 'enum'}
 
+    @template_var
     def base_extensions(self):
         """
         Extracts extension of base types from the typedefs.
@@ -292,6 +299,7 @@ class Module(NodeWrapper):
         return {name: data for name, data in self.typedefs.items()
                 if data.type.group == 'base'}
 
+    @template_var
     def types(self):
         """
         Extracts extension of defined types from the typedefs.
@@ -301,6 +309,7 @@ class Module(NodeWrapper):
         return {name: data for name, data in self.typedefs.items()
                 if data.type.group == 'type'}
 
+    @template_var
     def unions(self):
         """
         Extracts all unions from the typedefs.
@@ -310,6 +319,7 @@ class Module(NodeWrapper):
         return {name: data for name, data in self.typedefs.items()
                 if data.type.group == 'union'}
 
+    @template_var
     def rpc_imports(self):
         return {imp for _, data in getattr(self, 'rpcs', ())
                 for imp in getattr(data, 'imports', ())}
@@ -409,6 +419,7 @@ class Typonder(NodeWrapper):
                 else:
                     logging.warning("Unmatched type: %s", stmt.arg)
 
+    @template_var
     def member_imports(self):
         """
         :return: Imports that are needed for this type if it is a member of a
@@ -498,6 +509,7 @@ class Enumeration(NodeWrapper):
             if stmt.keyword == 'enum':
                 self.enums[stmt.arg] = Enum(stmt, self)
 
+    @template_var
     def has_javanames(self):
         """
         Checks if at least one enum name was modified.
@@ -642,6 +654,7 @@ class Grouponder(NodeWrapper):
                 java_name = to_camelcase(java_name)
                 self.vars[java_name] = result
 
+    @template_var
     def inherited_vars(self):
         """
         Collects a dictionary of inherited variables that are needed for
@@ -658,6 +671,7 @@ class Grouponder(NodeWrapper):
                 result[var_name] = var
         return result
 
+    @template_var
     def imports(self):
         """
         Collects all the imports that are needed for the grouping.
@@ -701,6 +715,7 @@ class Grouping(Grouponder):
                         var.name = case.arg
                         self.vars[java_name] = var
 
+    @template_var
     def type(self):
         # FIXME: needs fixing for more than one uses
         if not self.vars:
@@ -709,12 +724,14 @@ class Grouping(Grouponder):
         else:
             return None
 
+    @template_var
     def inheritance_imports(self):
         """
         :return: Imports needed if inheriting from this class.
         """
         return self.java_imports
 
+    @template_var
     def member_imports(self):
         return self.java_imports
 
@@ -764,6 +781,7 @@ class Container(Grouponder):
             self.top().add_class(self.java_type, self)
             self.java_imports.add_import(self.package(), self.java_type)
 
+    @template_var
     def member_imports(self):
         """
         :return: imports needed if this class is a member
