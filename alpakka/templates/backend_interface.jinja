@@ -1,3 +1,8 @@
+{%- macro parent_prefix(node) -%}
+{%- if node.parent -%}
+    {{ parent_prefix(node.parent) }}{{ node.statement.arg | replace('-', '') | firstupper }}
+{%- endif -%}
+{%- endmacro -%}
 package {{ ctx.package }};
 
 import akka.http.javadsl.server.Route;
@@ -12,4 +17,7 @@ public interface {{ name }} {
     {%- endfor %}{% endif -%}
     );
 {% endfor %}
+{%- for name, child in ctx.module.children.items() recursive %}
+  public {{child.java_type}} get{{ parent_prefix(child.parent) }}{{ name | replace('-', '') | firstupper }}();{{ loop(child.children.items()) }}
+{%- endfor %}
 }

@@ -128,21 +128,22 @@ class AkkaPlugin(plugin.PyangPlugin):
             self.fill_template('empty_config.jinja',
                                {'empty_XML_config': module})
             # run only if rpcs are available
-            if module.rpcs:
-                if_name = '%sInterface' % module.java_name
-                rpc_imports = {imp for rpc in module.rpcs.values()
-                               if hasattr(rpc, 'imports')
-                               for imp in rpc.imports()}
-                rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports,
-                            'package': module.package(),
-                            'path': module.subpath()}
-                self.fill_template('backend_interface.jinja',
-                                   {if_name: rpc_dict})
-                rpc_dict['interface_name'] = if_name
-                self.fill_template('backend_impl.jinja',
-                                   {'%sBackend' % module.java_name: rpc_dict})
-                self.fill_template('routes.jinja',
-                                   {'%sRoutes' % module.java_name: rpc_dict})
+            # if module.rpcs:
+            if_name = '%sInterface' % module.java_name
+            rpc_imports = {imp for rpc in module.rpcs.values()
+                           if hasattr(rpc, 'imports')
+                           for imp in rpc.imports()}
+            rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports,
+                        'package': module.package(),
+                        'path': module.subpath(),
+                        'module': module}
+            self.fill_template('backend_interface.jinja',
+                               {if_name: rpc_dict})
+            rpc_dict['interface_name'] = if_name
+            self.fill_template('backend_impl.jinja',
+                               {'%sBackend' % module.java_name: rpc_dict})
+            self.fill_template('routes.jinja',
+                               {'%sRoutes' % module.java_name: rpc_dict})
 
     def fill_template(self, template_name, description_dict):
         """
