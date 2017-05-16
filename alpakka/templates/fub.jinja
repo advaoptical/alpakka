@@ -5,3 +5,13 @@
  */
 {%- endif %}
 {%- endmacro -%}
+
+{%- macro parent_prefix(node) -%}
+{%- if node.parent -%}
+    {{ parent_prefix(node.parent) }}{{ node.statement.arg | replace('-', '') | firstupper }}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro interface_method(prefix, name, node) -%}
+{{ prefix }}{{ parent_prefix(node.parent) }}{{ name | replace('-', '') | firstupper }}()
+{%- endmacro -%}

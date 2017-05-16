@@ -1,8 +1,4 @@
-{%- macro parent_prefix(node) -%}
-{%- if node.parent -%}
-    {{ parent_prefix(node.parent) }}{{ node.statement.arg | replace('-', '') | firstupper }}
-{%- endif -%}
-{%- endmacro -%}
+{%- from 'fub.jinja' import  parent_prefix, interface_method -%}
 package {{ ctx.package }};
 
 import java.util.List;
@@ -18,6 +14,6 @@ public interface {{ name }} {
     );
 {% endfor %}
 {%- for name, child in ctx.module.children.items() recursive %}
-  public {{child.java_type}} get{{ parent_prefix(child.parent) }}{{ name | replace('-', '') | firstupper }}();{{ loop(child.children.items()) }}
+  public {{child.java_type}} {{ interface_method('get', name, child) }};{{ loop(child.children.items()) }}
 {%- endfor %}
 }
