@@ -8,9 +8,10 @@ from pyang import plugin
 from alpakka.wrapper import wrap_module, nodewrapper
 
 default_values = {
-    'int': '0',
+    'int': 0,
     'boolean': 'false'
 }
+
 
 def firstupper(value):
     """
@@ -18,8 +19,14 @@ def firstupper(value):
     the rest of the string.
     In case the value starts with an '_' it is removed and the following letter
     is made upper case.
+
     :param value: the string to be processed
     :return: the value with a upper case first letter
+
+    >>> firstupper('helloworld')
+    'Helloworld'
+    >>> firstupper('_HelloWorld')
+    'HelloWorld'
     """
     value = value.lstrip('_')
     return value and value[0].upper() + value[1:]
@@ -29,13 +36,30 @@ def firstlower(value):
     """
     Makes the first letter of the value lower case without touching
     the rest of the string.
+
     :param value: the string to be processed
     :return: the value with a lower case first letter
+
+    >>> firstlower('HelloWorld')
+    'helloWorld'
     """
     return value and value[0].lower() + value[1:]
 
 
 def java_default(value):
+    """
+    Maps the java type to the corresponding default value.
+
+    :param value: the java type string
+    :return: the default value
+
+    >>> java_default('int')
+    0
+    >>> java_default('boolean')
+    'false'
+    >>> java_default('Object')
+    'null'
+    """
     return default_values.get(value, 'null')
 
 
