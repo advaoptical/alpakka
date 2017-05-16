@@ -3,6 +3,7 @@ package {{ ctx.package }};
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import akka.http.javadsl.marshallers.jackson.Jackson;
+import akka.http.javadsl.model.StatusCodes;
 import akka.http.javadsl.server.AllDirectives;
 import akka.http.javadsl.server.Route;
 {% for import in ctx.imports -%}
@@ -40,6 +41,16 @@ public class {{ name }} extends AllDirectives {
             {{ name }}(){% if not loop.last %},
             {% endif %}
         {%- endfor %}));
+  }
+  {% set mod = ctx.module %}
+  public Route get{{ mod.java_name }}Route() {
+  return get(()-> {% if mod.children | length > 1 %} route( {%endif%}
+  {%- for name, child in mod.children.items() recursive %}
+  pathPrefix("{{ name }}", {% if child.children %} () -> route(
+{{ loop(child.children.items()) }}, {% else %} () -> {%- endif %} complete(StatusCodes.OK))
+{%- if child.children %}){% endif %}{% if not loop.last %},{% endif %}
+{%- endfor %}{% if mod.children | length > 1 -%} ) {%- endif %}
+  );
   }
 
 }

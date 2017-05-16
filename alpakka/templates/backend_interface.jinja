@@ -5,7 +5,7 @@
 {%- endmacro -%}
 package {{ ctx.package }};
 
-import akka.http.javadsl.server.Route;
+import java.util.List;
 {% for import in ctx.imports -%}
 import {{ import }};
 {%- endfor %}

@@ -122,11 +122,9 @@ class AkkaPlugin(plugin.PyangPlugin):
         # generate unions
         self.fill_template('union.jinja', module.unions())
         if not self.beans_only:
-            # generate routes for the data tree
-            self.fill_template('tree.jinja', {'Tree': module})
             # generate empty xml_config template for NETCONF use
-            self.fill_template('empty_config.jinja',
-                               {'empty_XML_config': module})
+            # self.fill_template('empty_config.jinja',
+            #                    {'empty_XML_config': module})
             # run only if rpcs are available
             # if module.rpcs:
             if_name = '%sInterface' % module.java_name
