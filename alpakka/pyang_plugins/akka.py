@@ -7,6 +7,10 @@ from pyang import plugin
 
 from alpakka.wrapper import wrap_module, nodewrapper
 
+default_values = {
+    'int': '0',
+    'boolean': 'false'
+}
 
 def firstupper(value):
     """
@@ -31,6 +35,10 @@ def firstlower(value):
     return value and value[0].lower() + value[1:]
 
 
+def java_default(value):
+    return default_values.get(value, 'null')
+
+
 def pyang_plugin_init():
     plugin.register_plugin(AkkaPlugin())
 
@@ -49,6 +57,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         # add filters to environment
         self.env.filters['firstupper'] = firstupper
         self.env.filters['firstlower'] = firstlower
+        self.env.filters['javadefault'] = java_default
 
     def add_output_format(self, fmts):
         self.multiple_modules = True

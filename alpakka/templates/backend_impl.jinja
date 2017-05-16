@@ -1,7 +1,7 @@
+{%- from 'fub.jinja' import  interface_method -%}
 package {{ ctx.package }};
 
-import akka.http.javadsl.server.Directives;
-import akka.http.javadsl.server.Route;
+import java.util.List;
 {% for import in ctx.imports -%}
 import {{ import }};
 {%- endfor %}
@@ -25,4 +25,9 @@ public class {{ name }} implements {{ ctx.interface_name }}{
     return Directives.complete(msg);
   }
 {% endfor %}
+{%- for name, child in ctx.module.children.items() recursive %}
+  public {{child.java_type}} {{ interface_method('get', name, child) }} {
+    return {{ child.java_type | javadefault }};
+  }{{ loop(child.children.items()) }}
+{%- endfor %}
 }
