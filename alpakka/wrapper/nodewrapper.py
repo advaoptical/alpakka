@@ -868,6 +868,13 @@ class List(Grouponder, yang='list'):
             # unknown list elements
             else:
                 self.java_type = 'List'
+        # collect list of keys
+        self.keys = []
+        if statement.i_key:
+            for key in statement.i_key:
+                self.keys.append(to_camelcase(key.arg))
+
+
 
 
 class Choice(Grouponder, yang='choice'):

@@ -1,10 +1,13 @@
 {%- from 'fub.jinja' import  interface_method -%}
 package {{ ctx.package }};
 
+import java.util.regex.Pattern;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import akka.http.javadsl.marshallers.jackson.Jackson;
 import akka.http.javadsl.server.AllDirectives;
+import akka.http.javadsl.server.PathMatchers;
 import akka.http.javadsl.server.Route;
 {% for import in ctx.imports -%}
 import {{ import }};
@@ -46,9 +49,9 @@ public class {{ name }} extends AllDirectives {
   public Route get{{ mod.java_name }}Route() {
   return get(()-> {% if mod.children | length > 1 %} route( {%endif%}
   {%- for name, child in mod.children.items() recursive %}
-  pathPrefix("{{ name }}", {% if child.children -%} () -> route(
-{{- loop(child.children.items()) }},
-    {% else -%} () -> {%- endif %} completeOK(backend.{{ interface_method('get', name, child) }}, Jackson.marshaller()))
+  pathPrefix({% if 'list' == child.group and child.keys%}PathMatchers.segment(Pattern.compile("{{ name }}=([^/]*)")), {{ child.keys[0] }} -> {% else %}"{{ name }}", () -> {% endif %}{% if child.children -%} route(
+  {{- loop(child.children.items()) }},
+  {%- endif -%} completeOK(backend.{{ interface_method('get', name, child) }}, Jackson.marshaller()))
 {%- if child.children %}){% endif %}{% if not loop.last %},{% endif %}
 {%- endfor %}{% if mod.children | length > 1 -%} ) {%- endif %}
   );
