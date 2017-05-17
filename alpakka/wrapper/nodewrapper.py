@@ -237,7 +237,7 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         # members that are available for all nodes
         self.statement = statement
         self.parent = parent
-        self.children = {}
+        self.children = OrderedDict()
         # the yang module name
         self.yang_module = (self.statement.top or self.statement).i_modulename
         # wrap all children of the node
