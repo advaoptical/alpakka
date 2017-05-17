@@ -16,8 +16,8 @@
 {{ prefix }}{{ parent_prefix(node.parent) }}{{ name | replace('-', '') | firstupper }}
 {%- endmacro -%}
 
-{%- macro key_parameters(node, type=None) -%}
-{%- for key in node.collect_keys() -%}
+{%- macro key_parameters(node, type=None, only_parent=False) -%}
+{%- for key in node.collect_keys(only_parent) -%}
 {% if type %}{{ type }} {% endif %}{{ key }}{% if not loop.last %}, {% endif %}
 {%- endfor -%}
 {%- endmacro -%}
