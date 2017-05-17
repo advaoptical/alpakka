@@ -1,4 +1,4 @@
-{%- from 'fub.jinja' import  interface_method -%}
+{%- from 'fub.jinja' import  interface_method, key_parameters -%}
 package {{ ctx.package }};
 
 import java.util.regex.Pattern;
@@ -49,11 +49,15 @@ public class {{ name }} extends AllDirectives {
   public Route get{{ mod.java_name }}Route() {
   return get(()-> {% if mod.children | length > 1 %} route( {%endif%}
   {%- for name, child in mod.children.items() recursive %}
-  pathPrefix({% if 'list' == child.group and child.keys%}PathMatchers.segment(Pattern.compile("{{ name }}=([^/]*)")), {{ child.keys[0] }} -> {% else %}"{{ name }}", () -> {% endif %}{% if child.children -%} route(
-  {{- loop(child.children.items()) }},
-  {%- endif -%} completeOK(backend.{{ interface_method('get', name, child) }}, Jackson.marshaller()))
-{%- if child.children %}){% endif %}{% if not loop.last %},{% endif %}
-{%- endfor %}{% if mod.children | length > 1 -%} ) {%- endif %}
+  pathPrefix({% if 'list' == child.group and child.keys -%}
+    PathMatchers.segment(Pattern.compile("{{ name }}=([^/]*)")), {{ child.keys[0] }} -> {% else -%}
+    "{{ name }}", () -> {% endif %}
+    {%- if child.children -%} route({{- loop(child.children.items()) }},
+    {%- endif -%}
+    completeOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child) -}} ), Jackson.marshaller()))
+    {%- if child.children -%} ) {%- endif -%}
+    {%- if not loop.last -%} , {%- endif -%}
+  {%- endfor %}{% if mod.children | length > 1 -%} ) {%- endif %}
   );
   }
 

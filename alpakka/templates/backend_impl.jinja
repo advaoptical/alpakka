@@ -1,4 +1,4 @@
-{%- from 'fub.jinja' import  interface_method -%}
+{%- from 'fub.jinja' import  interface_method, key_parameters -%}
 package {{ ctx.package }};
 
 import java.util.List;
@@ -26,7 +26,7 @@ public class {{ name }} implements {{ ctx.interface_name }}{
   }
 {% endfor %}
 {%- for name, child in ctx.module.children.items() recursive %}
-  public {{child.java_type}} {{ interface_method('get', name, child) }} {
+  public {{child.java_type}} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String') }}) {
     return {{ child.java_type | javadefault }};
   }{{ loop(child.children.items()) }}
 {%- endfor %}

@@ -13,5 +13,11 @@
 {%- endmacro -%}
 
 {%- macro interface_method(prefix, name, node) -%}
-{{ prefix }}{{ parent_prefix(node.parent) }}{{ name | replace('-', '') | firstupper }}()
+{{ prefix }}{{ parent_prefix(node.parent) }}{{ name | replace('-', '') | firstupper }}
+{%- endmacro -%}
+
+{%- macro key_parameters(node, type=None) -%}
+{%- for key in node.collect_keys() -%}
+{% if type %}{{ type }} {% endif %}{{ key }}{% if not loop.last %}, {% endif %}
+{%- endfor -%}
 {%- endmacro -%}
