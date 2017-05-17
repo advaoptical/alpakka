@@ -15,9 +15,9 @@ public interface {{ name }} {
 {% endfor %}
 {%- for name, child in ctx.module.children.items() recursive %}
   public {{child.java_type}} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String', True) }});
-  {%- if child.keys %}
+{% if child.keys %}
   public {{ child.element_type }} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String') }});
-  {%- endif -%}
+{% endif -%}
   {{- loop(child.children.items()) }}
 {%- endfor %}
 }

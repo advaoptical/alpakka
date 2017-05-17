@@ -301,8 +301,8 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
     def collect_keys(self, only_parents=False):
         """
         Collects the list keys all the way up through the hierarchy.
-        
-        :param only_parents: flag that decides if the own keys are skipped 
+
+        :param only_parents: flag that decides if the own keys are skipped
         :return: list of keys
         """
         result = []
