@@ -883,7 +883,7 @@ class List(Grouponder, yang='list'):
                 self.java_type = 'List'
         # collect list of keys
         self.keys = []
-        if statement.i_key:
+        if hasattr(statement, 'i_key'):
             for key in statement.i_key:
                 self.keys.append(to_camelcase(key.arg))
 
