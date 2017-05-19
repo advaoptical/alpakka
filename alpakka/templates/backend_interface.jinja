@@ -15,10 +15,12 @@ public interface {{ name }} {
     );
 {% endfor %}
 {%- for name, child in ctx.module.children.items() recursive %}
+{%- if loop.depth == 1 %}
   {{child.java_type}} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String', True) }});
-{% if child.keys %}
+{%- endif %}
+{%- if child.keys %}
   {{ child.element_type }} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String') }});
-{% endif -%}
+{%- endif -%}
   {{- loop(child.children.items()) }}
 {%- endfor %}
 }

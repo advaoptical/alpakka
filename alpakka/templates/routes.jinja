@@ -1,7 +1,10 @@
 {%- from 'fub.jinja' import  interface_method, key_parameters -%}
 package {{ ctx.package }};
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -15,6 +18,7 @@ import {{ import }};
 {%- endfor %}
 public class {{ name }} extends AllDirectives {
 
+  private static final Pattern PATH_MATCHER = Pattern.compile("([^/]*)");
   private static final Pattern KEY_MATCHER = Pattern.compile("=([^/]*)");
 
   private {{ ctx.interface_name }} backend;
@@ -49,16 +53,29 @@ public class {{ name }} extends AllDirectives {
         {%- endfor %}));
   }
 
-  public <T> Route jsonMarshallOK(T value) {
+  private <T> Route jsonMarshallOK(T value) {
     return pathEnd(() -> completeOK(value, Jackson.marshaller()));
   }
 
-  public Route extractKey(Function<String, Route> inner) {
+  private Route extractKey(Function<String, Route> inner) {
     return rawPathPrefix(PathMatchers.segment(KEY_MATCHER), inner);
   }
 
-  public <T> Route listRoute(String prefix, Function<String, Route> inner, T value) {
-    return pathPrefix(prefix, () -> route(extractKey(inner), jsonMarshallOK(value)));
+  private Route listRoute(String prefix, Function<String, Route> inner) {
+    return pathPrefix(prefix, () -> extractKey(inner));
+  }
+
+  private Route getValue(Supplier<Object> rootObj) {
+    return pathPrefix(PathMatchers.segment(PATH_MATCHER), methodName -> pathEnd(
+        () -> {
+          try {
+            Method method = rootObj.getClass().getMethod(methodName);
+            Object result = method.invoke(methodName);
+            return completeOK(result, Jackson.marshaller());
+          } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            return failWith(e);
+          }
+        }));
   }
 
   {% set mod = ctx.module %}
@@ -66,7 +83,7 @@ public class {{ name }} extends AllDirectives {
   return get(()-> {% if mod.children | length > 1 %} route( {%endif%}
   {%- for name, child in mod.children.items() recursive %}
   {%- set is_list = 'list' == child.group and child.keys %}
-  {%- if is_list -%}
+  {#%- if is_list -%}
     listRoute("{{ name }}", {{ child.keys[0] }} ->
   {%- else -%}
     pathPrefix("{{ name }}", () ->
@@ -76,7 +93,7 @@ public class {{ name }} extends AllDirectives {
     {%- if child.children -%} ) {%- endif -%}
     {%- if is_list %}, jsonMarshallOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child,only_parent=True) -}} ))
     {%- endif %})
-    {%- if not loop.last -%} , {%- endif -%}
+    {%- if not loop.last -%} , {%- endif -%#}
   {%- endfor %}
   {%- if mod.children | length > 1 -%} ) {%- endif %}
   );
