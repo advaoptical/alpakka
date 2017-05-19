@@ -1,6 +1,7 @@
 {%- from 'fub.jinja' import  interface_method, key_parameters -%}
 package {{ ctx.package }};
 
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -47,23 +48,37 @@ public class {{ name }} extends AllDirectives {
             {% endif %}
         {%- endfor %}));
   }
+
+  public <T> Route jsonMarshallOK(T value) {
+    return pathEnd(() -> completeOK(value, Jackson.marshaller()));
+  }
+
+  public Route extractKey(Function<String, Route> inner) {
+    return rawPathPrefix(PathMatchers.segment(KEY_MATCHER), inner);
+  }
+
+  public <T> Route listRoute(String prefix, Function<String, Route> inner, T value) {
+    return pathPrefix(prefix, () -> route(extractKey(inner), jsonMarshallOK(value)));
+  }
+
   {% set mod = ctx.module %}
   public Route get{{ mod.java_name }}Route() {
   return get(()-> {% if mod.children | length > 1 %} route( {%endif%}
   {%- for name, child in mod.children.items() recursive %}
   {%- set is_list = 'list' == child.group and child.keys %}
-  pathPrefix("{{ name }}", () ->
   {%- if is_list -%}
-    route(rawPathPrefix(PathMatchers.segment(KEY_MATCHER), {{ child.keys[0] }} ->
+    listRoute("{{ name }}", {{ child.keys[0] }} ->
+  {%- else -%}
+    pathPrefix("{{ name }}", () ->
   {%- endif -%}
   {%- if child.children -%} route({{- loop(child.children.items()) }},{%- endif -%}
-    pathEnd(() -> completeOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child) -}} ), Jackson.marshaller())))
-    {%- if is_list and child.children -%} ) {%- endif -%}
-    {%- if is_list %}, pathEnd(() -> completeOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child,only_parent=True) -}} ), Jackson.marshaller()))))
-    {%- endif %}
-    {%- if not is_list and child.children -%} ) {%- endif -%}
+    jsonMarshallOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child) -}} ))
+    {%- if child.children -%} ) {%- endif -%}
+    {%- if is_list %}, jsonMarshallOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child,only_parent=True) -}} ))
+    {%- endif %})
     {%- if not loop.last -%} , {%- endif -%}
-  {%- endfor %}{% if mod.children | length > 1 -%} ) {%- endif %}
+  {%- endfor %}
+  {%- if mod.children | length > 1 -%} ) {%- endif %}
   );
   }
 
