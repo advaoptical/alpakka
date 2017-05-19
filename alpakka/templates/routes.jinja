@@ -19,7 +19,7 @@ public class {{ name }} extends AllDirectives {
 
   private {{ ctx.interface_name }} backend;
 
-  public {{ name }} ({{ ctx.interface_name }} backend) {
+  public {{ name }}({{ ctx.interface_name }} backend) {
     this.backend = backend;
   }
 {% for name, rpc in ctx.rpcs.items() %}

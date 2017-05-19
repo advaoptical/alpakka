@@ -8,16 +8,16 @@ import {{ import }};
 {%- endfor %}
 public interface {{ name }} {
 {% for key, rpc in ctx.rpcs.items() %}
-  public Route {{ key }}(
+  Route {{ key }}(
     {%- if rpc.input %}{% for name, input in rpc.input.vars.items() -%}
     {{ input.java_type }} {{ name }}{% if not loop.last %}, {% endif %}
     {%- endfor %}{% endif -%}
     );
 {% endfor %}
 {%- for name, child in ctx.module.children.items() recursive %}
-  public {{child.java_type}} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String', True) }});
+  {{child.java_type}} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String', True) }});
 {% if child.keys %}
-  public {{ child.element_type }} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String') }});
+  {{ child.element_type }} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String') }});
 {% endif -%}
   {{- loop(child.children.items()) }}
 {%- endfor %}
