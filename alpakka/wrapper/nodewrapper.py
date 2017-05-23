@@ -151,7 +151,7 @@ def java_class_name(name):
     >>> java_class_name('some-type')
     'SomeType'
     """
-    return name.capitalize().replace("-", " ").title().replace(" ", "")
+    return name.replace("-", " ").title().replace(" ", "")
 
 
 def to_camelcase(string):

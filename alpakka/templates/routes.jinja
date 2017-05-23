@@ -6,6 +6,8 @@ import java.lang.reflect.Method;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -18,7 +20,7 @@ import {{ import }};
 {%- endfor %}
 public class {{ name }} extends AllDirectives {
 
-  private static final Pattern PATH_MATCHER = Pattern.compile("([^/]*)");
+  private static final Pattern PATH_MATCHER = Pattern.compile("([^=]*)");
   private static final Pattern KEY_MATCHER = Pattern.compile("=([^/]*)");
 
   private {{ ctx.interface_name }} backend;
@@ -53,8 +55,16 @@ public class {{ name }} extends AllDirectives {
         {%- endfor %}));
   }
 
-  private <T> Route jsonMarshallOK(T value) {
-    return pathEnd(() -> completeOK(value, Jackson.marshaller()));
+  /**
+   * This route matches a pathend, retrieves the return value from the supplier and
+   * applies a JSON marshaller.
+   *
+   * @param value the supplier for the value to be marshalled
+   * @param <T> the type of the value
+   * @return the route
+   */
+  private <T> Route jsonMarshallOK(Supplier<T> value) {
+    return pathEnd(() -> completeOK(value.get(), Jackson.marshaller()));
   }
 
   private Route extractKey(Function<String, Route> inner) {
@@ -66,23 +76,41 @@ public class {{ name }} extends AllDirectives {
   }
 
   private Route getValue(Supplier<Object> rootObj) {
-    return pathPrefix(PathMatchers.segment(PATH_MATCHER), methodName -> pathEnd(
-        () -> {
-          try {
-            Method method = rootObj.getClass().getMethod(methodName);
-            Object result = method.invoke(methodName);
-            return completeOK(result, Jackson.marshaller());
-          } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-            return failWith(e);
-          }
-        }));
+    return pathPrefix(PathMatchers.segment(PATH_MATCHER), methodName -> pathEnd(() -> {
+      try {
+        Object obj = rootObj.get();
+        Method method = obj.getClass().getMethod(toJavaName(methodName));
+        return completeOK(method.invoke(obj), Jackson.marshaller());
+      } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        return failWith(e);
+      }
+    }));
+  }
+
+  private static String toJavaName(String path) {
+    return "get" + Stream.of(path.split("-"))
+        .map(part -> part.substring(0, 1).toUpperCase() + part.substring(1))
+        .collect(Collectors.joining());
   }
 
   {% set mod = ctx.module %}
   public Route get{{ mod.java_name }}Route() {
-  return get(()-> {% if mod.children | length > 1 %} route( {%endif%}
+  return get(()-> route(
   {%- for name, child in mod.children.items() recursive %}
   {%- set is_list = 'list' == child.group and child.keys %}
+  {%- if child.children -%}
+  {%- if is_list -%}
+    listRoute("{{ name }}", {{ child.keys[0] }}
+  {%- else -%}
+    pathPrefix("{{ name }}", ()
+  {%- endif -%}
+  -> route(jsonMarshallOK(() -> backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child) -}} )),
+  {#%- endif -%#}
+  {%- if child.children -%} {{- loop(child.children.items()) }}{%- endif -%}
+  {%- if child.children -%} getValue(() -> backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child) -}} ))) {%- endif -%} )
+  {%- if not (loop.depth == 1 and loop.last) -%} , {%- endif -%}
+  {%- endif -%}
+
   {#%- if is_list -%}
     listRoute("{{ name }}", {{ child.keys[0] }} ->
   {%- else -%}
@@ -94,8 +122,7 @@ public class {{ name }} extends AllDirectives {
     {%- if is_list %}, jsonMarshallOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child,only_parent=True) -}} ))
     {%- endif %})
     {%- if not loop.last -%} , {%- endif -%#}
-  {%- endfor %}
-  {%- if mod.children | length > 1 -%} ) {%- endif %}
+  {%- endfor -%} )
   );
   }
 
