@@ -7,6 +7,11 @@ from pyang import plugin
 
 from alpakka.wrapper import wrap_module, nodewrapper
 
+default_values = {
+    'int': 0,
+    'boolean': 'false'
+}
+
 
 def firstupper(value):
     """
@@ -14,8 +19,14 @@ def firstupper(value):
     the rest of the string.
     In case the value starts with an '_' it is removed and the following letter
     is made upper case.
+
     :param value: the string to be processed
     :return: the value with a upper case first letter
+
+    >>> firstupper('helloworld')
+    'Helloworld'
+    >>> firstupper('_HelloWorld')
+    'HelloWorld'
     """
     value = value.lstrip('_')
     return value and value[0].upper() + value[1:]
@@ -25,10 +36,31 @@ def firstlower(value):
     """
     Makes the first letter of the value lower case without touching
     the rest of the string.
+
     :param value: the string to be processed
     :return: the value with a lower case first letter
+
+    >>> firstlower('HelloWorld')
+    'helloWorld'
     """
     return value and value[0].lower() + value[1:]
+
+
+def java_default(value):
+    """
+    Maps the java type to the corresponding default value.
+
+    :param value: the java type string
+    :return: the default value
+
+    >>> java_default('int')
+    0
+    >>> java_default('boolean')
+    'false'
+    >>> java_default('Object')
+    'null'
+    """
+    return default_values.get(value, 'null')
 
 
 def pyang_plugin_init():
@@ -49,6 +81,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         # add filters to environment
         self.env.filters['firstupper'] = firstupper
         self.env.filters['firstlower'] = firstlower
+        self.env.filters['javadefault'] = java_default
 
     def add_output_format(self, fmts):
         self.multiple_modules = True
@@ -122,27 +155,26 @@ class AkkaPlugin(plugin.PyangPlugin):
         # generate unions
         self.fill_template('union.jinja', module.unions())
         if not self.beans_only:
-            # generate routes for the data tree
-            self.fill_template('tree.jinja', {'Tree': module})
             # generate empty xml_config template for NETCONF use
-            self.fill_template('empty_config.jinja',
-                               {'empty_XML_config': module})
+            # self.fill_template('empty_config.jinja',
+            #                    {'empty_XML_config': module})
             # run only if rpcs are available
-            if module.rpcs:
-                if_name = '%sInterface' % module.java_name
-                rpc_imports = {imp for rpc in module.rpcs.values()
-                               if hasattr(rpc, 'imports')
-                               for imp in rpc.imports()}
-                rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports,
-                            'package': module.package(),
-                            'path': module.subpath()}
-                self.fill_template('backend_interface.jinja',
-                                   {if_name: rpc_dict})
-                rpc_dict['interface_name'] = if_name
-                self.fill_template('backend_impl.jinja',
-                                   {'%sBackend' % module.java_name: rpc_dict})
-                self.fill_template('routes.jinja',
-                                   {'%sRoutes' % module.java_name: rpc_dict})
+            # if module.rpcs:
+            if_name = '%sInterface' % module.java_name
+            rpc_imports = {imp for rpc in module.rpcs.values()
+                           if hasattr(rpc, 'imports')
+                           for imp in rpc.imports()}
+            rpc_dict = {'rpcs': module.rpcs, 'imports': rpc_imports,
+                        'package': module.package(),
+                        'path': module.subpath(),
+                        'module': module}
+            self.fill_template('backend_interface.jinja',
+                               {if_name: rpc_dict})
+            rpc_dict['interface_name'] = if_name
+            self.fill_template('backend_impl.jinja',
+                               {'%sBackend' % module.java_name: rpc_dict})
+            self.fill_template('routes.jinja',
+                               {'%sRoutes' % module.java_name: rpc_dict})
 
     def fill_template(self, template_name, description_dict):
         """

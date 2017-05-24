@@ -4,7 +4,6 @@ from collections import OrderedDict
 
 from alpakka.templates import template_var
 
-
 # configuration for logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
@@ -238,7 +237,7 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         # members that are available for all nodes
         self.statement = statement
         self.parent = parent
-        self.children = {}
+        self.children = OrderedDict()
         # the yang module name
         self.yang_module = (self.statement.top or self.statement).i_modulename
         # wrap all children of the node
@@ -298,6 +297,18 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
             return self.parent.top()
         else:
             return self
+
+    def collect_keys(self, only_parents=False):
+        """
+        Collects the list keys all the way up through the hierarchy.
+
+        :param only_parents: flag that decides if the own keys are skipped
+        :return: list of keys
+        """
+        result = self.parent and self.parent.collect_keys() or []
+        if not only_parents:
+            result += getattr(self, 'keys', ())
+        return result
 
 
 class Module(NodeWrapper):
@@ -868,6 +879,9 @@ class List(Grouponder, yang='list'):
             # unknown list elements
             else:
                 self.java_type = 'List'
+        # collect list of keys
+        self.keys = [to_camelcase(key.arg)
+                     for key in getattr(statement, 'i_key', ())]
 
 
 class Choice(Grouponder, yang='choice'):
