@@ -305,11 +305,9 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         :param only_parents: flag that decides if the own keys are skipped
         :return: list of keys
         """
-        result = []
-        if self.parent:
-            result = self.parent.collect_keys()
-        if not only_parents and hasattr(self, 'keys'):
-            return result + self.keys
+        result = self.parent and self.parent.collect_keys() or []
+        if not only_parents:
+            result += getattr(self, 'keys', ())
         return result
 
 
@@ -882,10 +880,8 @@ class List(Grouponder, yang='list'):
             else:
                 self.java_type = 'List'
         # collect list of keys
-        self.keys = []
-        if hasattr(statement, 'i_key'):
-            for key in statement.i_key:
-                self.keys.append(to_camelcase(key.arg))
+        self.keys = [to_camelcase(key.arg)
+                     for key in getattr(statement, 'i_key', ())]
 
 
 class Choice(Grouponder, yang='choice'):
