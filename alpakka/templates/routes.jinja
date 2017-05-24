@@ -3,14 +3,15 @@ package {{ ctx.package }};
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
+{% if ctx.rpcs %}
 import com.fasterxml.jackson.annotation.JsonProperty;
-
+{% endif %}
 import akka.http.javadsl.marshallers.jackson.Jackson;
 import akka.http.javadsl.server.AllDirectives;
 import akka.http.javadsl.server.PathMatchers;
@@ -28,7 +29,8 @@ public class {{ name }} extends AllDirectives {
   public {{ name }}({{ ctx.interface_name }} backend) {
     this.backend = backend;
   }
-{% for name, rpc in ctx.rpcs.items() %}
+{%- if ctx.rpcs %}
+{%- for name, rpc in ctx.rpcs.items() %}
   {%- if rpc.input and rpc.input.vars %}
   public static class Rpc{{ name | firstupper }} {
     {%- for name, input in rpc.input.vars.items() %}
@@ -54,6 +56,7 @@ public class {{ name }} extends AllDirectives {
             {% endif %}
         {%- endfor %}));
   }
+{% endif %}
 
   /**
    * This route matches a pathend, retrieves the return value from the supplier and
@@ -67,33 +70,71 @@ public class {{ name }} extends AllDirectives {
     return pathEnd(() -> completeOK(value.get(), Jackson.marshaller()));
   }
 
+  /**
+   * Extracts the key from the URI based on '='.
+   * Example: .../example=key1/... extracts key1
+   *
+   * @param inner inner function using the key
+   * @return the route
+   */
   private Route extractKey(Function<String, Route> inner) {
     return rawPathPrefix(PathMatchers.segment(KEY_MATCHER), inner);
   }
 
+  /**
+   * Creates a route that can be used for lists. It matches the prefix first and then extracts the
+   * key.
+   *
+   * @param prefix the name of the list
+   * @param inner the inner function using the key
+   * @return the route
+   */
   private Route listRoute(String prefix, Function<String, Route> inner) {
     return pathPrefix(prefix, () -> extractKey(inner));
   }
 
+  /**
+   * Route that gets the supplied root object and calls the requested method based on the extracted
+   * path.
+   *
+   * @param rootObj the supplier for the root object for the method call
+   * @return the route
+   */
   private Route getValue(Supplier<Object> rootObj) {
     return pathPrefix(PathMatchers.segment(PATH_MATCHER), methodName -> pathEnd(() -> {
       try {
         Object obj = rootObj.get();
         Method method = obj.getClass().getMethod(toJavaName(methodName));
-        return completeOK(method.invoke(obj), Jackson.marshaller());
+        // by using completion stages waiting for the response can be avoided
+        if (CompletionStage.class.equals(method.getReturnType())) {
+          return completeOKWithFuture((CompletionStage<?>) method.invoke(obj),
+              Jackson.marshaller());
+        } else
+          return completeOK(method.invoke(obj), Jackson.marshaller());
       } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
         return failWith(e);
       }
     }));
   }
 
+  /**
+   * The function translates a string to the corresponding method name that can be used for the
+   * method invocation.
+   * Example: intent-id -> getIntentId
+   *
+   * @param path the path to be translated
+   * @return the method name
+   */
   private static String toJavaName(String path) {
     return "get" + Stream.of(path.split("-"))
         .map(part -> part.substring(0, 1).toUpperCase() + part.substring(1))
         .collect(Collectors.joining());
   }
 
-  {% set mod = ctx.module %}
+  {% set mod = ctx.module -%}
+  /**
+   * @return the route that results from the yang tree
+   */
   public Route get{{ mod.java_name }}Route() {
   return get(()-> route(
   {%- for name, child in mod.children.items() recursive %}
@@ -110,18 +151,6 @@ public class {{ name }} extends AllDirectives {
   {%- if child.children -%} getValue(() -> backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child) -}} ))) {%- endif -%} )
   {%- if not (loop.depth == 1 and loop.last) -%} , {%- endif -%}
   {%- endif -%}
-
-  {#%- if is_list -%}
-    listRoute("{{ name }}", {{ child.keys[0] }} ->
-  {%- else -%}
-    pathPrefix("{{ name }}", () ->
-  {%- endif -%}
-  {%- if child.children -%} route({{- loop(child.children.items()) }},{%- endif -%}
-    jsonMarshallOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child) -}} ))
-    {%- if child.children -%} ) {%- endif -%}
-    {%- if is_list %}, jsonMarshallOK(backend.{{ interface_method('get', name, child) }}( {{- key_parameters(child,only_parent=True) -}} ))
-    {%- endif %})
-    {%- if not loop.last -%} , {%- endif -%#}
   {%- endfor -%} )
   );
   }
