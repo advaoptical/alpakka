@@ -1,9 +1,8 @@
 {%- from 'fub.jinja' import  interface_method, key_parameters -%}
 package {{ ctx.package }};
 
-import akka.http.javadsl.server.Route;
-import java.util.List;
-{% for import in ctx.imports -%}
+{% if ctx.rpcs %}import akka.http.javadsl.server.Route;{% endif %}
+{%- for import in ctx.imports -%}
 import {{ import }};
 {%- endfor %}
 public interface {{ name }} {

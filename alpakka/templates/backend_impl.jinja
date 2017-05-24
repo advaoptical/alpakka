@@ -1,6 +1,7 @@
 {%- from 'fub.jinja' import  interface_method, key_parameters -%}
 
 {%- macro default_method(name, child, return_type, parents_only=False) %}
+@Override
 public {{ return_type }} {{ interface_method('get', name, child) }}({{ key_parameters(child, 'String', parents_only) }}) {
   System.out.println("{{ interface_method('get', name, child) }}");
   return {{ child.java_type | javadefault }};
@@ -9,7 +10,6 @@ public {{ return_type }} {{ interface_method('get', name, child) }}({{ key_param
 
 package {{ ctx.package }};
 
-import java.util.List;
 {% for import in ctx.imports -%}
 import {{ import }};
 {%- endfor %}
@@ -34,8 +34,8 @@ public class {{ name }} implements {{ ctx.interface_name }}{
   }
 {% endfor %}
 {%- for name, child in ctx.module.children.items() recursive -%}
-  {{ default_method(name, child, child.java_type, True) | indent(2) }}
-  {%- if child.keys -%} {{ default_method(name, child, child.element_type) | indent(2) }} {%- endif %}
+  {%- if loop.depth == 1 %}{{ default_method(name, child, child.java_type, True) | indent(2) }}{%- endif -%}
+  {%- if child.keys -%} {{ default_method(name, child, child.element_type) | indent(2) }} {%- endif -%}
 {{ loop(child.children.items()) }}
 {%- endfor %}
 }
