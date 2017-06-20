@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 import alpakka
 from alpakka.wools import Wool
-from alpakka.templates import template_var
+from alpakka.templates import template_var, create_context
 
 
 WOOLS = alpakka.WOOLS
@@ -300,6 +300,10 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
             elif stmt.keyword == 'config':
                 self.config = statement.arg.lower() == 'true'
 
+    @property
+    def template_context(self):
+        return create_context(self)
+
     @template_var
     def package(self):
         """
@@ -402,7 +406,7 @@ class Module(NodeWrapper, yang='module'):
 
     @template_var
     def rpc_imports(self):
-        return {imp for _, data in getattr(self, 'rpcs', ())
+        return {imp for _, data in getattr(self, 'rpcs', {}).items()
                 for imp in getattr(data, 'imports', ())}
 
     def add_class(self, class_name, wrapped_description):
