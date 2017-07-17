@@ -7,6 +7,7 @@ from pyang import plugin
 
 from alpakka.wrapper import wrap_module, nodewrapper
 
+
 default_values = {
     'int': 0,
     'boolean': 'false'
@@ -94,6 +95,10 @@ class AkkaPlugin(plugin.PyangPlugin):
         """
         options = [
             optparse.make_option(
+                "-w", "--wool", action="store", dest="wool",
+                help="The Wool to use for knitting the code"
+            ),
+            optparse.make_option(
                 "--akka-output-path", dest="akka_output", action="store",
                 help="output path for the generated classes"
             ),
@@ -124,7 +129,7 @@ class AkkaPlugin(plugin.PyangPlugin):
                 logging.info("Wrapping module %s (%s)",
                              module.arg, module.i_latest_revision)
                 # wrap module statement
-                wrapped_module = wrap_module(module)
+                wrapped_module = wrap_module(module, wool=self.wool)
                 self.generate_classes(wrapped_module)
             else:
                 logging.info("No children in module %s (%s)",
@@ -135,6 +140,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         Extract option parameters from the context.
         :param ctx: the context
         """
+        self.wool = ctx.opts.wool
         # set package prefix
         if ctx.opts.akka_prefix:
             nodewrapper.NodeWrapper.prefix = ctx.opts.akka_prefix
