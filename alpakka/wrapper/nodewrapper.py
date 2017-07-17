@@ -1,16 +1,18 @@
 import logging
 import re
+import sys
 from collections import OrderedDict
 
+import alpakka
+from alpakka.wools import Wool
 from alpakka.templates import template_var
+
+
+WOOLS = alpakka.WOOLS
+
 
 # configuration for logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
-
-
-# registry for derived NodeWrapper classes, automagically filled by
-# NodeWrapperMeta
-YANG_NODE_TO_WRAPPER = {}
 
 
 # appendix indicating a list type class
@@ -202,7 +204,7 @@ class NodeWrapperMeta(type):
     Metaclass for :class:`NodeWrapper`
 
     Allows to add the YANG node name to the definition of a derived class,
-    which automagically registers that class in ``YANG_NODE_TO_WRAPPER``
+    which automagically registers that class in its Wool.
 
     See :class:`NodeWrapper` for usage examples
     """
@@ -212,8 +214,38 @@ class NodeWrapperMeta(type):
 
     def __init__(cls, clsname, bases, clsattrs, *args, yang=None):
         type.__init__(cls, clsname, bases, clsattrs, *args)
+
+        # To get registered, the class must NOT be defined in sub-packages
+        # (sub-directories) of this basic wrapper package or a wool package.
+        # Only classes from sub-modules (.py files) are allowed
+        pkgname = sys.modules[cls.__module__].__package__
+        if pkgname == sys.modules[__name__].__package__:
+            wool = getattr(WOOLS, 'default', None)
+            if wool is None:
+                wool = WOOLS.default = Wool('default', __name__)
+        elif pkgname in WOOLS:
+            wool = WOOLS[pkgname]
+        else:
+            return
+
+        # Give every class reference to its Wools for easy access
+        cls.WOOL = wool
+
+        wrapdict = wool._yang_wrappers
+
+        # If we have an explicit class SomeWrapper(..., yang=<yang name>)
+        # relation, then just add it to the wrapper dict
         if yang:
-            YANG_NODE_TO_WRAPPER[yang] = cls
+            wrapdict[yang] = cls
+            return
+
+        # Otherwise look if any base class already exists in the wrapper dict
+        # and exchange it accordingly
+        wrapitems = list(wrapdict.items())
+        for base in cls.mro()[1:]:
+            for yangname, wrapcls in wrapitems:
+                if wrapcls is base:
+                    wrapdict[yangname] = cls
 
 
 class NodeWrapper(metaclass=NodeWrapperMeta):
@@ -226,9 +258,11 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
     >>> class SomeNode(NodeWrapper, yang='some-node'):
     ...     pass
 
-    This will automagically register that class in ``YANG_NODE_TO_WRAPPER``:
+    This will automagically register that class its Wool. In this case to
+    ``WOOLS.default``, since we are in the default wool package and not in a
+    customized wool:
 
-    >>> YANG_NODE_TO_WRAPPER['some-node']
+    >>> WOOLS.default['some-node']
     <class 'alpakka.wrapper.nodewrapper.SomeNode'>
     """
     prefix = ""
@@ -242,7 +276,7 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         self.yang_module = (self.statement.top or self.statement).i_modulename
         # wrap all children of the node
         for child in getattr(statement, 'i_children', []):
-            child_wrapper = YANG_NODE_TO_WRAPPER.get(child.keyword)
+            child_wrapper = self.WOOL.get(child.keyword)
             if child_wrapper:
                 # START of special handling for choice statements:
                 if child.keyword == 'choice':
@@ -255,8 +289,8 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
                 else:
                     self.children[child.arg] = child_wrapper(child, self)
             else:
-                logging.info("No wrapper for yang type: %s (%s)" %
-                             (child.keyword, child.arg))
+                logging.debug("No wrapper for yang type: %s (%s)" %
+                              (child.keyword, child.arg))
         # statements that might be available in general
         for stmt in statement.substmts:
             # store the description if available
@@ -311,7 +345,7 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         return result
 
 
-class Module(NodeWrapper):
+class Module(NodeWrapper, yang='module'):
     """
     Wrapper class for a module statement.
     """
@@ -682,10 +716,10 @@ class Grouponder(NodeWrapper):
                 continue
 
             # find a node wrapper for supported variable types
-            child_wrapper = YANG_NODE_TO_WRAPPER.get(stmt.keyword)
+            child_wrapper = self.WOOL.get(stmt.keyword)
             if not child_wrapper:
-                logging.info("No wrapper for yang type: %s (%s)" %
-                             (stmt.keyword, stmt.arg))
+                logging.debug("No wrapper for yang type: %s (%s)" %
+                              (stmt.keyword, stmt.arg))
                 continue
 
             result = child_wrapper(stmt, self)
