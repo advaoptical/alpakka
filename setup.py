@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='alpakka',
     version='0.1.dev',
-    description="Akka code stub generator from YANG models via pyang.",
+    description="Cutest YANG Eater alive",
 
     install_requires=['pyang', 'jinja2', 'path.py', 'pluggy>=0.4'],
 
