@@ -15,36 +15,6 @@ WOOLS = alpakka.WOOLS
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
 
-# appendix indicating a list type class
-JAVA_LIST_CLASS_APPENDIX = 'ListType'
-
-# Java imports for using lists in an interface
-JAVA_LIST_IMPORTS = ('java.util', 'List')
-
-# Java type used to instantiate lists
-JAVA_LIST_INSTANCE_IMPORTS = ('com.google.common.collect', 'ImmutableList')
-
-# list of reserved words in Java
-JAVA_RESERVED_WORDS = frozenset(["switch", "case"])
-
-# regular expressions mapping yang types to Java types
-TYPE_PATTERNS_TO_JAVA = [
-    (r"u?int\d*", "int"),
-    (r"string", "String"),
-    (r"boolean", "boolean"),
-    (r"decimal64", "double"),
-    (r"binary", "byte[]"),
-    (r"empty", "Object"),
-]
-
-# Java wrapper classes for base types (needed for hashCode)
-JAVA_WRAPPER_CLASSES = {
-    "int": "Integer",
-    "boolean": "Boolean",
-    "double": "Double"
-}
-
-
 class ImportDict:
     """
     Class that is used to store imports.
@@ -112,91 +82,6 @@ class ImportDict:
         """
         return {'%s.%s' % (pkg, cls) for pkg, classes in self.imports.items()
                 for cls in classes}
-
-
-def type_to_java(yang):
-    """
-    Converts built-in YANG types to the corresponding Java types.
-
-    If no mapping is available, a ``ValueError`` is raised.
-
-    :param yang: input YANG type string
-    :return: Java type string
-
-    >>> type_to_java('int32')
-    'int'
-    >>> type_to_java('uint16')
-    'int'
-    >>> type_to_java('empty')
-    'Object'
-
-    >>> type_to_java('invalid')
-    Traceback (most recent call last):
-      ...
-    ValueError: No Java type mapping for 'invalid'
-    """
-    for pattern, java in TYPE_PATTERNS_TO_JAVA:
-        if re.match(r'^%s$' % pattern, yang):
-            return java
-
-    raise ValueError("No Java type mapping for %s" % repr(yang))
-
-
-def java_class_name(name):
-    """
-    Cleanup for names that need to follow Java class name restrictions.
-    Add any further processing here.
-
-    :param name: the name to be cleaned up
-    :return: class name following Java convention
-
-    >>> java_class_name('some-type')
-    'SomeType'
-    """
-    return name.replace("-", " ").title().replace(" ", "")
-
-
-def to_camelcase(string):
-    """
-    Creates a camel case representation by removing hyphens.
-    The first letter is lower case everything else remains untouched.
-
-    :param string: string to be processed
-    :return: camel case representation of the string
-
-    >>> to_camelcase('Hello-world')
-    'helloWorld'
-    """
-    name = string[0].lower() + string[1:]
-    name = re.sub(r'[-](?P<first>[a-zA-Z])',
-                  lambda m: m.group('first').upper(),
-                  name)
-    # check if the name is a reserved word and prepend '_'
-    if name in JAVA_RESERVED_WORDS:
-        return '_' + name
-    else:
-        return name
-
-
-def to_package(string, prefix=None):
-    """
-    Converts the string to a package name by making it lower case,
-    replacing '-' with '.' and adding a prefix if available.
-
-    :param string: the string to be converted
-    :param prefix: the prefix for the package
-    :return: package name
-
-    >>> to_package('yang-module')
-    'yang.module'
-
-    >>> to_package('yang-module', 'fancy')
-    'fancy.yang.module'
-    """
-    package = string.lower().replace("-", ".")
-    if prefix:
-        package = '%s.%s' % (prefix, package)
-    return package
 
 
 class NodeWrapperMeta(type):
@@ -310,6 +195,7 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         The pakackage name of this module.
         :return: the package name
         """
+        # FIXME: @Felix how a general package representation could be builded
         return to_package(self.yang_module, NodeWrapper.prefix)
 
     @template_var
@@ -349,6 +235,82 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         return result
 
 
+class Grouponder(NodeWrapper):
+    """
+    Base class for node wrappers that group variables.
+    """
+
+    def __init__(self, statement, parent):
+        super().__init__(statement, parent)
+        self.vars = OrderedDict()
+        self.uses = OrderedDict()
+        # find all available variables in the sub-statements
+        for stmt in statement.substmts:
+            if stmt.keyword == 'uses':
+                # class name for the import
+                # TODO: @Felix rename class_name to a more intuitive and understandable variable name
+                class_name = stmt.i_grouping.arg
+                # add the grouping to the list of super classes
+                self.uses[class_name] = Grouping(stmt.i_grouping, self)
+                self.top().add_class(class_name, self.uses[class_name])
+                continue
+
+            # find a node wrapper for supported variable types
+            child_wrapper = self.WOOL.get(stmt.keyword)
+            if not child_wrapper:
+                logging.debug("No wrapper for yang type: %s (%s)" %
+                              (stmt.keyword, stmt.arg))
+                continue
+
+            result = child_wrapper(stmt, self)
+            result.name = stmt.arg
+            # remove leading underscores from the name
+            # TODO: @Felix rename java_name to a more intuitive and understandable variable name
+            # TODO: @Felix should string manipulations be avoided and be performed in the wool specific manipulation
+            # java_name = re.sub(r'^_', '', stmt.arg)
+            java_name = stmt.arg
+            self.vars[java_name] = result
+
+    @template_var
+    def inherited_vars(self):
+        """
+        Collects a dictionary of inherited variables that are needed for
+        super calls.
+        :return: dictionary of inherited variables
+        """
+        result = OrderedDict()
+        for name, parent_group in self.uses.items():
+            # collect variables that are inherited by the parent
+            for inh_name, var in parent_group.inherited_vars().items():
+                result[inh_name] = var
+            # collect variables available in the parent class
+            for var_name, var in parent_group.vars.items():
+                result[var_name] = var
+        return result
+
+    # TODO: @Felix are imports language specific?
+    @template_var
+    def imports(self):
+        """
+        Collects all the imports that are needed for the grouping.
+        :return: set of imports
+        """
+        imports = ImportDict()
+        # imports from children
+        for child in self.children.values():
+            imports.merge(child.java_imports)
+        # imports from super classes
+        for inherit in self.uses.values():
+            imports.merge(inherit.inheritance_imports())
+        for var in self.vars.values():
+            # checking if there is at least one list defined in the grouponder
+            if hasattr(var, 'group') and var.group == 'list':
+                #imports.add_import(JAVA_LIST_INSTANCE_IMPORTS[0],
+                #                   JAVA_LIST_INSTANCE_IMPORTS[1])
+                break
+        return imports.get_imports()
+
+
 class Module(NodeWrapper, yang='module'):
     """
     Wrapper class for a module statement.
@@ -356,13 +318,19 @@ class Module(NodeWrapper, yang='module'):
 
     def __init__(self, statement, parent=None):
         # IMPORTANT: prepare dictionaries before calling super init!
-        self.classes = OrderedDict()
+        self.containers = OrderedDict()
+        self.enumerations = OrderedDict()
+        self.lists = OrderedDict()
+        self.groupings = OrderedDict()
+        self.leafs = OrderedDict()
+        self.leaflists = OrderedDict()
         self.rpcs = OrderedDict()
         self.typedefs = OrderedDict()
         # call the super constructor
         super().__init__(statement, parent)
         # store the java name of the module
-        self.java_name = java_class_name(statement.i_prefix)
+        # TODO: @Felix rename java_name to a more intuitive and understandable variable name
+        self.java_name = statement.i_prefix
 
     @template_var
     def enums(self):
@@ -409,44 +377,59 @@ class Module(NodeWrapper, yang='module'):
         return {imp for _, data in getattr(self, 'rpcs', {}).items()
                 for imp in getattr(data, 'imports', ())}
 
-    def add_class(self, class_name, wrapped_description):
+    def add_container(self, container_name, wrapped_description):
         """
-        Add a class to the collection that needs to be generated.
+        Add an Container that needs to be generated.
 
-        :param class_name: the class name to be used
+        :param container_name: the name of the Container
         :param wrapped_description: the wrapped node description
         """
-        # TODO: might need additional processing
-        if class_name in self.classes.keys():
-            logging.debug("Class already in the list: %s", class_name)
-            if len(wrapped_description.children) != len(
-                    self.classes[class_name].children
-            ):
-                logging.warning(
-                    "Number of children mismatch for %s between stored "
-                    "module %s and new module %s",
-                    class_name, self.classes[class_name].yang_module,
-                    self.yang_module)
-            # print(self.classes[class_name].children.keys())
-            old = set(self.classes[class_name].children.keys())
-            new = set(wrapped_description.children.keys())
-            # print the different children
-            diff = old ^ new
-            if diff:
-                logging.warning(
-                    "Child mismatch for class %s between module %s and %s: %s",
-                    class_name, self.classes[class_name].yang_module,
-                    self.yang_module, diff)
-        else:
-            self.classes[class_name] = wrapped_description
+        self.containers[container_name] = wrapped_description
 
-    def del_class(self, class_name):
+    def add_enumeration(self, enumeration_name, wrapped_description):
         """
-        Deletes a class from the collection.
+        Add an Enumeration that needs to be generated.
 
-        :param class_name: the class to be removed
+        :param enumeration_name: the name of the Enumeration
+        :param wrapped_description: the wrapped node description
         """
-        self.classes.pop(class_name)
+        self.enumerations[enumeration_name] = wrapped_description
+
+    def add_list(self, list_name, wrapped_description):
+        """
+        Add an List that needs to be generated.
+
+        :param list_name: the name of the List
+        :param wrapped_description: the wrapped node description
+        """
+        self.lists[list_name] = wrapped_description
+
+    def add_grouping(self, grouping_name, wrapped_description):
+        """
+        Add an Grouping that needs to be generated.
+
+        :param grouping_name: the name of the List
+        :param wrapped_description: the wrapped node description
+        """
+        self.groupings[grouping_name] = wrapped_description
+
+    def add_leaf(self, leaf_name, wrapped_description):
+        """
+        Add an Leaf that needs to be generated.
+
+        :param leaf_name: the name of the Leaf
+        :param wrapped_description: the wrapped node description
+        """
+        self.leafs[leaf_name] = wrapped_description
+
+    def add_leaflist(self, leaflist_name, wrapped_description):
+        """
+        Add an Leaflist that needs to be generated.
+
+        :param leaflist_name: the name of the Leaflist
+        :param wrapped_description: the wrapped node description
+        """
+        self.leaflists[leaflist_name] = wrapped_description
 
     def add_rpc(self, rpc_name, wrapped_description):
         """
@@ -464,7 +447,6 @@ class Module(NodeWrapper, yang='module'):
         :param typedef_name: the name of the type definition
         :param wrapped_description: the wrapped node description
         """
-        # TODO: might need additional processing
         self.typedefs[typedef_name] = wrapped_description
 
 
@@ -837,7 +819,7 @@ class Container(Grouponder, yang='container'):
                 java_name = re.sub(r'^_', '', ch_wrapper.name)
                 java_name = to_camelcase(java_name)
                 self.vars[java_name] = ch_wrapper
-                self.top().add_class(self.java_type, self)
+                self.top().add_container(self.java_type, self)
                 self.java_imports.add_import(self.package(), self.java_type)
         # containers that just import a grouping don't need a new class
         # -> variable
