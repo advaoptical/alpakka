@@ -110,9 +110,9 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         # members that are available for all nodes
         self.statement = statement
         self.parent = parent
-        self.yang_type = statement.keyword
+        self.yang_stmt_type = statement.keyword
         # the yang module name
-        self.yang_module_name = statement.arg
+        self.yang_stmt_name = statement.arg
         # statements that might be available in general
         for stmt in statement.substmts:
             # store the description if available
@@ -142,16 +142,16 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
     def generate_key(self):
         key = ''
         # Key generation for elements which are unique inside a module
-        if self.yang_type == 'grouping' or self.yang_type == 'typedef':
-            name = self.yang_module_name.split(':')
+        if self.yang_stmt_type == 'grouping' or self.yang_stmt_type == 'typedef':
+            name = self.yang_stmt_name.split(':')
             if len(name) == 1:
-                return self.top().yang_module_name + '/' + name[0]
+                return self.statement.parent.arg + '/' + name[0]
         # Key generation for all other Statements
         else:
             if self.parent:
                 key = self.parent.generate_key()
 
-            return key + "/" + self.yang_module_name
+            return key + "/" + self.yang_stmt_name
 
 
 class Typonder(NodeWrapper):
@@ -175,8 +175,8 @@ class Typonder(NodeWrapper):
                 self.data_type = [i.arg for i in statement.substmts if i.keyword == 'type'][0]
                 # check is the derived_type imported from another module or implemented in the local module
                 if self.data_type not in self.top().derived_types.keys():
-                    typedef = self.top().statement.i_typedefs[self.data_type]
-                    self.top().children[self.data_type] = TypeDef(typedef, self.top())
+                    typedef = [i.i_typedef for i in statement.substmts if i.keyword == 'type'][0]
+                    self.top().derived_types[self.data_type] = TypeDef(typedef, self.top())
                 self.is_build_in_type = False
 
             if self.data_type == 'enumeration':
@@ -401,11 +401,15 @@ class Leaf(Typonder, yang='leaf'):
 
     @template_var
     def substmt_default(self):
-        return [item.arg for item in self.statement.substmts if item.keyword == 'default'][0]
+        for item in self.statement.substmts:
+            if item.keyword == 'default':
+                return item.arg
 
     @template_var
     def substmt_mandatory(self):
-        return [item.arg for item in self.statement.substmts if item.keyword == 'mandatory'][0]
+        for item in self.statement.substmts:
+            if item.keyword == 'mandatory':
+                return item.arg
 
 
 class Container(Grouponder, yang='container'):
@@ -467,13 +471,13 @@ class TypeDef(Typonder, yang='typedef'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        if statement.arg not in self.top().derived_types.keys():
-            self.top().derived_types[statement.arg] = self
-            self.top().add_typedef(self.generate_key(), self)
+        self.top().add_typedef(self.generate_key(), self)
 
     @template_var
     def substmt_default(self):
-        return [item.arg for item in self.statement.substmts if item.keyword == 'default'][0]
+        for item in self.statement.substmts:
+            if item.keyword == 'default':
+                return item.arg
 
 
 class Listonder():
@@ -482,10 +486,14 @@ class Listonder():
     """
 
     def substmt_min_elements(self):
-        return [i.arg for i in self.statement.substmts if i.keyword == 'min-elements'][0]
+        for i in self.statement.substmts:
+            if i.keyword == 'min-elements':
+                return i.arg
 
     def substmt_max_elements(self):
-        return [i.arg for i in self.statement.substmts if i.keyword == 'max-elements'][0]
+        for i in self.statement.substmts:
+            if i.keyword == 'max-elements':
+                return i.arg
 
 
 class LeafList(Typonder, Listonder, yang='leaf-list'):
@@ -537,11 +545,16 @@ class Choice(Grouponder, yang='choice'):
 
     @template_var
     def substmt_default(self):
-        return [item.arg for item in self.statement.substmts if item.keyword == 'default'][0]
+        for item in self.statement.substmts:
+            if item.keyword == 'default':
+                return item.arg
 
     @template_var
     def substmt_mandatory(self):
-        return [item.arg for item in self.statement.substmts if item.keyword == 'mandatory'][0]
+        for item in self.statement.substmts:
+            if item.keyword == 'mandatory':
+                return item.arg
+        return 'False'
 
 
 class Case(Grouponder):
