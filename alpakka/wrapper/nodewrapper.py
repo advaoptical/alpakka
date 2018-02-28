@@ -12,7 +12,7 @@ WOOLS = alpakka.WOOLS
 
 
 # configuration for logging
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 
 TYPE_PATTERNS = OrderedDict([
@@ -141,10 +141,17 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
     @template_var
     def generate_key(self):
         key = ''
-        if self.parent:
-            key = self.parent.generate_key()
+        # Key generation for elements which are unique inside a module
+        if self.yang_type == 'grouping' or self.yang_type == 'typedef':
+            name = self.yang_module_name.split(':')
+            if len(name) == 1:
+                return self.top().yang_module_name + '/' + name[0]
+        # Key generation for all other Statements
+        else:
+            if self.parent:
+                key = self.parent.generate_key()
 
-        return key + "/" + self.yang_module_name
+            return key + "/" + self.yang_module_name
 
 
 class Typonder(NodeWrapper):
@@ -166,6 +173,7 @@ class Typonder(NodeWrapper):
                 self.is_build_in_type = True
             else:
                 self.data_type = [i.arg for i in statement.substmts if i.keyword == 'type'][0]
+                # check is the derived_type imported from another module or implemented in the local module
                 if self.data_type not in self.top().derived_types.keys():
                     typedef = self.top().statement.i_typedefs[self.data_type]
                     self.top().children[self.data_type] = TypeDef(typedef, self.top())
@@ -193,6 +201,9 @@ class Grouponder(NodeWrapper):
         # the following line separates stmts which are imported with 'uses' from normal integrated stmts
         children_list = set(getattr(statement, 'i_children', [])).intersection(getattr(statement, 'substmts', []))
 
+        if statement.keyword == 'input' or statement.keyword == 'output':
+            children_list = getattr(statement, 'i_children', [])
+
         # wrap all children of the node
         for child in children_list:
             child_wrapper = self.WOOL.get(child.keyword)
@@ -208,6 +219,7 @@ class Grouponder(NodeWrapper):
                 # class name for the import
                 grouping_name = stmt.i_grouping.arg
                 # add the grouping to the list of super classes
+                # check is the grouping imported from another module or implemented in the local module
                 self.uses[grouping_name] = Grouping(stmt.i_grouping, self)
 
     @template_var
@@ -447,8 +459,6 @@ class Union(Typonder):
                 else:
                     self.types[stmt.arg] = stmt.arg
 
-# TODO: @Felix from here on old code
-
 
 class TypeDef(Typonder, yang='typedef'):
     """
@@ -507,7 +517,9 @@ class List(Grouponder, Listonder, yang='list'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.key = [i.arg for i in statement.substmts if i.keyword == 'key'][0]
+        for i in statement.substmts:
+            if i.keyword == 'key':
+                self.key = i.arg
         self.top().add_list(self.generate_key(), self)
 
 
@@ -547,7 +559,7 @@ class RPC(Grouponder, yang='rpc'):
         super().__init__(statement, parent)
         self.top().add_rpc(self.generate_key(), self)
 
-        for item in self.statement:
+        for item in self.statement.i_children:
             if item.keyword == 'input':
                 self.input = Input(item, self)
             elif item.keyword == 'output':
