@@ -1,7 +1,0 @@
-json_test_wool/__init__.py
-test_wool.egg-info/PKG-INFO
-test_wool.egg-info/SOURCES.txt
-test_wool.egg-info/dependency_links.txt
-test_wool.egg-info/entry_points.txt
-test_wool.egg-info/requires.txt
-test_wool.egg-info/top_level.txt

@@ -1,3 +1,0 @@
-[alpakka_wools]
-Json = json_test_wool
-
