@@ -5,6 +5,9 @@ import os
 from jinja2 import Environment, PackageLoader
 from pyang import plugin
 
+from IPython import start_ipython
+
+import alpakka
 from alpakka.wrapper import wrap_module, nodewrapper
 
 
@@ -111,6 +114,12 @@ class AkkaPlugin(plugin.PyangPlugin):
                 default=False,
                 help="create just the beans without the akka classes"
             ),
+            optparse.make_option(
+                "-i", "--interactive", action="store_true", dest="interactive",
+                default=False,
+                help="run alpakka in interactive mode by starting an IPython "
+                     "shell before template generation"
+            ),
         ]
         group = optparser.add_option_group("Akka output specific options")
         group.add_options(options)
@@ -124,16 +133,26 @@ class AkkaPlugin(plugin.PyangPlugin):
             for module_details, context_module in module.i_ctx.modules.items():
                 unique_modules.add(context_module)
         # wrap unique modules
+        wrapped_modules = []
         for module in unique_modules:
             if module.i_children:
                 logging.info("Wrapping module %s (%s)",
                              module.arg, module.i_latest_revision)
                 # wrap module statement
-                wrapped_module = wrap_module(module, wool=self.wool)
-                self.generate_classes(wrapped_module)
+                wrapped_modules.append(wrap_module(module, wool=self.wool))
             else:
                 logging.info("No children in module %s (%s)",
                              module.arg, module.i_latest_revision)
+        if ctx.opts.interactive:
+            start_ipython([], user_ns=dict(
+                ((module.statement.arg.replace('-', '_'), module)
+                 for module in wrapped_modules),
+                alpakka=alpakka,
+                render_template=self.render_template,
+            ))
+        else:
+            for module in wrapped_modules:
+                self.generate_classes(module)
 
     def get_options(self, ctx):
         """
@@ -148,6 +167,10 @@ class AkkaPlugin(plugin.PyangPlugin):
         if ctx.opts.akka_output:
             self.output_path = ctx.opts.akka_output
         self.beans_only = ctx.opts.beans_only
+
+    def render_template(self, template_name, context):
+        template = self.env.get_template(template_name)
+        return template.render(context)
 
     def generate_classes(self, module):
         # generate enum classes

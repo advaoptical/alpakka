@@ -21,5 +21,7 @@ def create_context(node):
     class:`alpakka.wrapper.nodewrapper.NodeWrapper` instance that are
     decorated with :func:`template_var`.
     """
-    return {name: member() for name, member in getmembers(node)
+    from alpakka.wrapper.nodewrapper import NodeWrapper
+
+    return {name: member(node) for name, member in getmembers(type(node))
             if getattr(member, '_is_template_var', False)}
