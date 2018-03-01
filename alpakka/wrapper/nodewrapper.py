@@ -505,9 +505,8 @@ class Union(Typonder):
             if stmt.keyword == 'type':
                 if stmt.arg in TYPE_PATTERNS.keys():
                     self.types[stmt.arg] = TYPE_PATTERNS[stmt.arg]
-                # TODO: Muss auf die aktuelle key convention angepasst werden.
-                elif stmt.arg in self.top().derived_types.keys():
-                    self.types[stmt.arg] = self.top().derived_types[stmt.arg]
+                elif (stmt.parent.arg + '/' + stmt.arg) in self.top().derived_types.keys():
+                    self.types[stmt.arg] = self.top().derived_types[(stmt.parent.arg + '/' + stmt.arg)]
                 else:
                     self.types[stmt.arg] = stmt.arg
 
