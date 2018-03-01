@@ -121,18 +121,26 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
 
         self.statement = statement
         self.parent = parent
-        self.yang_stmt_type = statement.keyword
-        self.yang_stmt_name = statement.arg
         for stmt in statement.substmts:
-
             if stmt.keyword == 'description' and stmt.arg.lower() != "none":
                 self.description = stmt.arg
             elif stmt.keyword == 'config':
                 self.config = statement.arg.lower() == 'true'
+        if self.top() is not self:
+            nodes = self.top().all_nodes.setdefault(statement.keyword, OrderedDict())
+            nodes[self.generate_key()] = self
 
     @property
     def template_context(self):
         return create_context(self)
+
+    @template_var
+    def yang_name(self):
+        return self.statement.arg
+
+    @template_var
+    def yang_type(self):
+        return self.statement.keyword
 
     @template_var
     def top(self):
@@ -146,23 +154,25 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         else:
             return self
 
-    @template_var
     def generate_key(self):
         """
-        Generates a string which represents the path from the root element of the Statement to the target as unique
-        key. In the case of imported Statements the string represents only the top element and the target element name
+        Generates a string which represents the path from the root element of
+        the Statement to the target as uniquekey. In the case of imported
+        Statements the string represents only the top element and the target
+        element name
+
         :return: a unique key which is a human readable path to the module
         """
         key = ''
         # Key generation for elements which could be imported from other Modules or be implemented locally
-        if self.yang_stmt_type == 'grouping' or self.yang_stmt_type == 'typedef':
-            return self.statement.parent.arg + '/' + self.yang_stmt_name
+        if self.yang_type() == 'grouping' or self.yang_type() == 'typedef':
+            return self.statement.parent.arg + '/' + self.yang_name()
         # Key generation for all other Statements
         else:
             if self.parent:
                 key = self.parent.generate_key()
 
-            return key + "/" + self.yang_stmt_name
+            return key + "/" + self.yang_name()
 
 
 class Typonder(NodeWrapper):
@@ -174,34 +184,59 @@ class Typonder(NodeWrapper):
         """
         Constructor for a typonder which extracts the data-type.
 
-        :param data_type: string containing the argument of the type attribute of the yang statement
-        :param is_build_in_type: boolean indicating is the data_type a yang base type or a typedef type
-        :param enumeration: attribute containing the enumeration object if the data_type is enumeration
-        :param union: attribute containing the union object if the data_type is union
+        :param data_type:
+            string containing the argument of the type attribute of the yang statement
+        :param is_build_in_type:
+            boolean indicating is the data_type a yang base type or a typedef type
+        :param enumeration:
+            attribute containing the enumeration object if the data_type is enumeration
+        :param union:
+            attribute containing the union object if the data_type is union
         """
         super().__init__(statement, parent)
-        if [i.arg for i in statement.substmts if i.keyword == 'type']:
+        type_stmt = statement.search_one('type')
+        if type_stmt:
             # processing if the yang type is a base type
-            if [i.arg for i in statement.substmts if i.keyword == 'type'][0] in TYPE_PATTERNS.keys():
-                self.data_type = TYPE_PATTERNS[[i.arg for i in statement.substmts if i.keyword == 'type'][0]]
+            if type_stmt.arg in TYPE_PATTERNS:
+                for pattern, wool_type_name in self.WOOL._data_type_patterns.items():
+                    if re.match(pattern, type_stmt.arg):
+                        self.data_type = wool_type_name
+                        break
+                else:
+                    self.data_type = type_stmt.arg
                 self.is_build_in_type = True
             # processing if the yang type is typedef
             else:
-                self.data_type = [i.arg for i in statement.substmts if i.keyword == 'type'][0]
+                self.data_type = type_stmt.arg
                 # check is the typedef already generated
                 if self.data_type not in self.top().derived_types.keys():
-                    typedef = [i.i_typedef for i in statement.substmts if i.keyword == 'type'][0]
-                    self.top().derived_types[self.data_type] = TypeDef(typedef, self.top())
+                    self.top().derived_types[self.data_type] = (
+                        self.WOOL['typedef'](type_stmt.i_typedef,
+                                             parent=self.top()))
                 self.is_build_in_type = False
 
             # special processing if the data_type is enumeration
             if self.data_type == 'enumeration':
-                enumeration = [i for i in statement.substmts if i.keyword == 'type'][0]
-                self.enumeration = Enumeration(enumeration, self)
+                self.enumeration = Enumeration(type_stmt, parent=self)
             # special processing if the data_type is an union
             elif self.data_type == 'union':
-                union = [i for i in statement.substmts if i.keyword == 'type'][0]
-                self.union = Union(union, self)
+                self.union = Union(type_stmt, parent=self)
+
+    @template_var
+    def default_value(self):
+        # TODO: Add description
+        for item in self.statement.substmts:
+            if item.keyword == 'default':
+                return item.arg
+
+    @template_var
+    def is_mandatory(self):
+        # TODO: Add description
+        for item in self.statement.substmts:
+            if item.keyword == 'mandatory':
+                return item.arg == 'true'
+
+        return False
 
 
 class Grouponder(NodeWrapper):
@@ -221,17 +256,15 @@ class Grouponder(NodeWrapper):
         self.children = OrderedDict()
 
         # the following line separates stmts which are imported with 'uses' from normal integrated stmts
-        children_list = set(getattr(statement, 'i_children', [])).intersection(getattr(statement, 'substmts', []))
-
-        # special handling for input and output stmt, because of the behavior which is similar to uses
-        if statement.keyword == 'input' or statement.keyword == 'output':
-            children_list = getattr(statement, 'i_children', [])
+        children_list = set(getattr(statement, 'i_children', ()))
+        if statement.keyword not in ('input', 'output'):
+            children_list.intersection_update(getattr(statement, 'substmts', ()))
 
         # wrap all children of the node
         for child in children_list:
             child_wrapper = self.WOOL.get(child.keyword)
             if child_wrapper:
-                self.children[child.arg] = child_wrapper(child, self)
+                self.children[child.arg] = child_wrapper(child, parent=self)
             else:
                 logging.debug("No wrapper for yang type: %s (%s)" %
                               (child.keyword, child.arg))
@@ -242,12 +275,25 @@ class Grouponder(NodeWrapper):
                 # check is the used grouping already wrapped
                 # if so, the wrapped grouping is linked in the 'uses' variable
                 # if not a the grouping statement is wrapped
-                if 'grouping' in self.top().modules:
-                    if (stmt.i_grouping.parent.arg + '/' + stmt.i_grouping.arg) in self.top().modules['grouping']:
-                        self.uses[stmt.i_grouping.arg] = self.top().modules['grouping'][(stmt.i_grouping.parent.arg + '/' + stmt.i_grouping.arg)]
-                else:
-                    self.uses[stmt.i_grouping.arg] = Grouping(stmt.i_grouping, self)
+                key = stmt.i_grouping.parent.arg + '/' + stmt.i_grouping.arg
+                group = self.top().all_nodes.get('grouping', {}).get(key)
+                self.uses[stmt.i_grouping.arg] = group or (
+                    self.WOOL['grouping'](stmt.i_grouping, parent=self))
 
+    def __getitem__(self, key):
+        return self.children[key]
+
+    def __getattr__(self, name):
+        key = name.replace('_', '-')
+        try:
+            return self.children[key]
+
+        except KeyError:
+            raise AttributeError("{!r} has no attribute {!r} or child {!r}"
+                                 .format(self, name, key))
+
+    def __dir__(self):
+        return super().__dir__() + [key.replace('-', '_') for key in self.children]
 
     @template_var
     def all_children(self):
@@ -255,7 +301,9 @@ class Grouponder(NodeWrapper):
         Collects a list of all child stmts of the current stmt regardless of the kind of implementation (local or import).
         :return: list of stmts
         """
-        return getattr(self.statement, 'i_children', [])
+        result = OrderedDict(self.children)
+        result.update(self.uses)
+        return result
 
 
 class Module(Grouponder, yang='module'):
@@ -270,154 +318,9 @@ class Module(Grouponder, yang='module'):
         :param modules: Dictionary of classes of yang statements, where each class is a dictionary of all wrapped statements of the current module
         :param derived_types: Dictionary of all type defs which are used inside this module
         """
-        self.modules = OrderedDict()
+        self.all_nodes = {}
         self.derived_types = OrderedDict()
-
         super().__init__(statement, parent)
-
-        # append the wrapped module object to the modules dictionary for 'modules'
-        self.modules['module'] = OrderedDict()
-        self.modules['module'][self.generate_key()] = self
-
-    @template_var
-    def add_container(self, container_name, wrapped_description):
-        """
-        Add an Container object to the overall collection.
-
-        :param container_name: the name of the Container
-        :param wrapped_description: the wrapped node description
-        """
-        if 'container' not in self.modules:
-            self.modules['container'] = OrderedDict()
-            self.modules['container'][container_name] = wrapped_description
-        elif container_name not in self.modules['container']:
-            self.modules['container'][container_name] = wrapped_description
-
-    @template_var
-    def add_enumeration(self, enumeration_name, wrapped_description):
-        """
-        Add an Enumeration object to the overall collection.
-
-        :param enumeration_name: the name of the Enumeration
-        :param wrapped_description: the wrapped node description
-        """
-        if 'enumeration' not in self.modules:
-            self.modules['enumeration'] = OrderedDict()
-            self.modules['enumeration'][enumeration_name] = wrapped_description
-        elif enumeration_name not in self.modules['enumeration']:
-            self.modules['enumeration'][enumeration_name] = wrapped_description
-
-    @template_var
-    def add_list(self, list_name, wrapped_description):
-        """
-        Add an List object to the overall collection.
-
-        :param list_name: the name of the List
-        :param wrapped_description: the wrapped node description
-        """
-        if 'list' not in self.modules:
-            self.modules['list'] = OrderedDict()
-            self.modules['list'][list_name] = wrapped_description
-        elif list_name not in self.modules['list']:
-            self.modules['list'][list_name] = wrapped_description
-
-    @template_var
-    def add_grouping(self, grouping_name, wrapped_description):
-        """
-        Add an Grouping object to the overall collection.
-
-        :param grouping_name: the name of the List
-        :param wrapped_description: the wrapped node description
-        """
-        if 'grouping' not in self.modules:
-            self.top().modules['grouping'] = OrderedDict()
-            self.top().modules['grouping'][grouping_name] = wrapped_description
-        elif grouping_name not in self.top().modules['grouping']:
-            self.top().modules['grouping'][grouping_name] = wrapped_description
-
-    @template_var
-    def add_leaf(self, leaf_name, wrapped_description):
-        """
-        Add an Leaf object to the overall collection.
-
-        :param leaf_name: the name of the Leaf
-        :param wrapped_description: the wrapped node description
-        """
-        if 'leaf' not in self.modules:
-            self.modules['leaf'] = OrderedDict()
-            self.modules['leaf'][leaf_name] = wrapped_description
-        elif leaf_name not in self.top().modules['leaf']:
-            self.modules['leaf'][leaf_name] = wrapped_description
-
-    @template_var
-    def add_leaflist(self, leaflist_name, wrapped_description):
-        """
-        Add an Leaflist object to the overall collection.
-
-        :param leaflist_name: the name of the Leaflist
-        :param wrapped_description: the wrapped node description
-        """
-        if 'leaflist' not in self.modules:
-            self.modules['leaflist'] = OrderedDict()
-            self.modules['leaflist'][leaflist_name] = wrapped_description
-        elif leaflist_name not in self.top().modules['leaflist']:
-            self.modules['leaflist'][leaflist_name] = wrapped_description
-
-    @template_var
-    def add_rpc(self, rpc_name, wrapped_description):
-        """
-        Add an RPC object to the overall collection.
-
-        :param rpc_name: the name of the RPC
-        :param wrapped_description:  the wrapped node description
-        """
-        if 'rpc' not in self.modules:
-            self.modules['rpc'] = OrderedDict()
-            self.modules['rpc'][rpc_name] = wrapped_description
-        elif rpc_name not in self.modules['rpc']:
-            self.modules['rpc'][rpc_name] = wrapped_description
-
-    @template_var
-    def add_typedef(self, typedef_name, wrapped_description):
-        """
-        Add a type definition object to the overall collection.
-
-        :param typedef_name: the name of the type definition
-        :param wrapped_description: the wrapped node description
-        """
-        if 'typedef' not in self.modules:
-            self.modules['typedef'] = OrderedDict()
-            self.modules['typedef'][typedef_name] = wrapped_description
-        elif typedef_name not in self.modules['typedef']:
-            self.modules['typedef'][typedef_name] = wrapped_description
-
-    @template_var
-    def add_choice(self, choice_name, wrapped_description):
-        """
-        Add a choice object to the overall collection.
-
-        :param choice_name: name of the choice object
-        :param wrapped_description: wrapped description of the choice object
-        """
-        if 'choice' not in self.modules:
-            self.modules['choice'] = OrderedDict()
-            self.modules['choice'][choice_name] = wrapped_description
-        elif choice_name not in self.modules['choice']:
-            self.modules['choice'][choice_name] = wrapped_description
-
-    @template_var
-    def add_union(self, union_name, wrapped_description):
-        """
-        Add a union object to the overall collection.
-
-        :param union_name: name of the union object
-        :param wrapped_description: wrapped description of the union object
-        """
-        if 'union' not in self.modules:
-            self.modules['union'] = OrderedDict()
-            self.modules['union'][union_name] = wrapped_description
-        elif union_name in self.modules['union']:
-            self.modules['union'][union_name] = wrapped_description
 
 
 class Leaf(Typonder, yang='leaf'):
@@ -429,30 +332,13 @@ class Leaf(Typonder, yang='leaf'):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         if self.data_type == 'leafref':
-            self.path = [i.substmts[0].arg for i in statement.substmts if i.keyword == 'type'][0]
-        self.top().add_leaf(self.generate_key(), self)
-
-    @template_var
-    def substmt_default(self):
-        """
-        Method to return the default value of the leaf if present, could be of different data type
-
-        :return default: the default value of the leaf
-        """
-        for item in self.statement.substmts:
-            if item.keyword == 'default':
-                return item.arg
-
-    @template_var
-    def substmt_mandatory(self):
-        """
-        Method to return a boolean indicating is the leaf a mandatory one or not, if the substmt is present
-
-        :return mandatory: boolean indicating mandatory or not
-        """
-        for item in self.statement.substmts:
-            if item.keyword == 'mandatory':
-                return item.arg
+            self.path = next((i.substmts[0].arg for i in statement.substmts if i.keyword == 'type'), None)
+            for i in statement.substmts:
+                if i.keyword == 'type':
+                    self.path = i.substmts[0].arg
+                    break
+            else:
+                self.path = None
 
 
 class Container(Grouponder, yang='container'):
@@ -462,7 +348,6 @@ class Container(Grouponder, yang='container'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.top().add_container(self.generate_key(), self)
 
 
 class Enum(Typonder):
@@ -505,10 +390,9 @@ class Union(Typonder):
             if stmt.keyword == 'type':
                 if stmt.arg in TYPE_PATTERNS.keys():
                     self.types[stmt.arg] = TYPE_PATTERNS[stmt.arg]
-                elif (stmt.parent.arg + '/' + stmt.arg) in self.top().derived_types.keys():
-                    self.types[stmt.arg] = self.top().derived_types[(stmt.parent.arg + '/' + stmt.arg)]
                 else:
-                    self.types[stmt.arg] = stmt.arg
+                    key = stmt.parent.arg + '/' + stmt.arg
+                    self.types[stmt.arg] = self.top().derived_types.get(key) or stmt.arg
 
 
 class TypeDef(Typonder, yang='typedef'):
@@ -518,18 +402,6 @@ class TypeDef(Typonder, yang='typedef'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.top().add_typedef(self.generate_key(), self)
-
-    @template_var
-    def substmt_default(self):
-        """
-        Method to return the default value of the typedef if present, could be of different data type
-
-        :return default: the default value of the typedef
-        """
-        for item in self.statement.substmts:
-            if item.keyword == 'default':
-                return item.arg
 
 
 class Listonder():
@@ -569,7 +441,6 @@ class LeafList(Typonder, Listonder, yang='leaf-list'):
         super().__init__(statement, parent)
         if self.data_type == 'leafref':
             self.path = [i.substmts[0].arg for i in statement.substmts if i.keyword == 'type'][0]
-        self.top().add_leaflist(self.generate_key(), self)
 
 
 class Grouping(Grouponder, yang='grouping'):
@@ -579,7 +450,6 @@ class Grouping(Grouponder, yang='grouping'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.top().add_grouping(self.generate_key(), self)
 
 
 class List(Grouponder, Listonder, yang='list'):
@@ -594,7 +464,6 @@ class List(Grouponder, Listonder, yang='list'):
         for i in statement.substmts:
             if i.keyword == 'key':
                 self.key = i.arg
-        self.top().add_list(self.generate_key(), self)
 
 
 class Choice(Grouponder, yang='choice'):
@@ -605,34 +474,9 @@ class Choice(Grouponder, yang='choice'):
     """
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-
         self.cases = OrderedDict()
         for case in [i for i in self.statement.substmts if i.keyword == 'case']:
             self.cases[case.arg] = Case(case, self)
-
-        self.top().add_choice(self.generate_key(), self)
-
-    @template_var
-    def substmt_default(self):
-        """
-        Method to return the default value of the choice if present, could be of different data type
-
-        :return default: the default value of the choice
-        """
-        for item in self.statement.substmts:
-            if item.keyword == 'default':
-                return item.arg
-
-    @template_var
-    def substmt_mandatory(self):
-        """
-        Method to return a boolean indicating is the choice a mandatory one or not, if the substmt is present
-
-        :return mandatory: boolean indicating mandatory or not
-        """
-        for item in self.statement.substmts:
-            if item.keyword == 'mandatory':
-                return item.arg
 
 
 class Case(Grouponder):
@@ -653,8 +497,6 @@ class RPC(Grouponder, yang='rpc'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        self.top().add_rpc(self.generate_key(), self)
-
         for item in self.statement.i_children:
             if item.keyword == 'input':
                 self.input = Input(item, self)

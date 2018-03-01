@@ -14,8 +14,9 @@ WOOLS = WoolsRegistry()
 from alpakka.wrapper import NodeWrapper  # Ignore PycodestyleBear (E402)
 
 
-def register_wool(name, package, parent=None):
-    return alpakka.wools.register(WOOLS, name, package, parent=parent)
+def register_wool(name, package, parent=None, data_type_patterns=None):
+    return alpakka.wools.register(WOOLS, name, package, parent=parent,
+                                  data_type_patterns=data_type_patterns)
 
 
 # auto-load all Wools which are defined as 'alpakka_wools' entry points in

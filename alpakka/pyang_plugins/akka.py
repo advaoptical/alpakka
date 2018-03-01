@@ -8,6 +8,7 @@ from pyang import plugin
 from IPython import start_ipython
 
 import alpakka
+from alpakka import WOOLS
 from alpakka.wrapper import wrap_module, nodewrapper
 
 
@@ -159,7 +160,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         Extract option parameters from the context.
         :param ctx: the context
         """
-        self.wool = ctx.opts.wool
+        self.wool = ctx.opts.wool and WOOLS[ctx.opts.wool]
         # set package prefix
         if ctx.opts.akka_prefix:
             nodewrapper.NodeWrapper.prefix = ctx.opts.akka_prefix

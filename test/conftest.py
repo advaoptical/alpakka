@@ -66,3 +66,15 @@ def yang_context():
     ctx = pyang.Context(repo)
 
     return ctx
+
+
+@pytest.fixture(scope='session')
+def yang_query():
+    def query(statement, yang_type):
+        for stmt in getattr(statement, 'i_children', ()):
+            if stmt.keyword == yang_type:
+                yield stmt
+            yield from query(stmt, yang_type)
+
+    return query
+

@@ -28,7 +28,7 @@ def load_from_entry_points():
         woolpoint.load()
 
 
-def register(registry, name, package, parent=None):
+def register(registry, name, package, parent=None, data_type_patterns=None):
     """
     Creates a new :class:`alpakka.Wool` instance and adds it to the
     given `registry`
@@ -46,7 +46,8 @@ def register(registry, name, package, parent=None):
     else:
         parentwool = registry.default
 
-    wool = Wool(name, package, parent=parentwool)
+    wool = Wool(name, package, parent=parentwool,
+                data_type_patterns=data_type_patterns)
     registry.pluggy_manager.register(package, wool)
 
     LOGGER.info("Registered {!r}".format(wool))
@@ -62,10 +63,10 @@ class Wool(str):
     wool is created by lowering the wool name and stored via the ``str`` base
     """
 
-    def __new__(cls, name, package, parent=None):
+    def __new__(cls, name, package, parent=None, data_type_patterns=None):
         return str.__new__(cls, name.lower())
 
-    def __init__(self, name, package, parent=None):
+    def __init__(self, name, package, parent=None, data_type_patterns=None):
         """
         :param name:    The wool's name
         :param package: The wool's fully-qualified python package name
@@ -75,6 +76,11 @@ class Wool(str):
         self.name = name
         self.package = package
         self.parent = parent
+
+        self._data_type_patterns = (parent and
+                                    dict(parent._data_type_patterns) or {})
+        if data_type_patterns is not None:
+            self._data_type_patterns.update(data_type_patterns)
 
         self._yang_wrappers = parent and dict(parent._yang_wrappers) or {}
 
