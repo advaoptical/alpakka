@@ -71,7 +71,9 @@ def yang_context():
 @pytest.fixture(scope='session')
 def yang_query():
     def query(statement, yang_type):
-        for stmt in getattr(statement, 'i_children', ()):
+        node_list = set(getattr(statement, 'i_children', ()))
+        node_list.intersection_update(getattr(statement, 'substmts', ()))
+        for stmt in node_list:
             if stmt.keyword == yang_type:
                 yield stmt
             yield from query(stmt, yang_type)

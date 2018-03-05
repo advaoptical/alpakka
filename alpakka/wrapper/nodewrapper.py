@@ -7,13 +7,10 @@ import alpakka
 from alpakka.wools import Wool
 from alpakka.templates import template_var, create_context
 
-
 WOOLS = alpakka.WOOLS
-
 
 # configuration for logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
-
 
 TYPE_PATTERNS = OrderedDict([
     ('binary', 'binary'),
@@ -112,11 +109,16 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
 
         Attributes which are common for all wrapped statements
         :param statement: the original statement generated from pyang
-        :param parent: the wrapped parent statement of the current statement, None for the top element
-        :param yang_stmt_type: yang type of the current statment, like module, container, list, leaf and so on
-        :param yang_stmt_name: name of the current statement, is the same like in the original yang file
-        :param description: string containing the description of the current statement provided by the yang file
-        :param config: if the current statement has config substatement the value this one is stored in this variable
+        :param parent: the wrapped parent statement of the current statement,
+                None for the top element
+        :param yang_stmt_type: yang type of the current statment, like module,
+                container, list, leaf and so on
+        :param yang_stmt_name: name of the current statement, is the same
+                like in the original yang file
+        :param description: string containing the description of the current
+                statement provided by the yang file
+        :param config: if the current statement has config substatement the
+                value this one is stored in this variable
         """
 
         self.statement = statement
@@ -125,9 +127,11 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
             if stmt.keyword == 'description' and stmt.arg.lower() != "none":
                 self.description = stmt.arg
             elif stmt.keyword == 'config':
-                self.config = statement.arg.lower() == 'true'
-        if self.top() is not self:
-            nodes = self.top().all_nodes.setdefault(statement.keyword, OrderedDict())
+                self.config = stmt.arg.lower() == 'true'
+        if self.top() is not self and self.yang_type() not in ('enum', 'input',
+                                                             'output', 'type'):
+            nodes = self.top().all_nodes.setdefault(statement.keyword,
+                                                    OrderedDict())
             nodes[self.generate_key()] = self
 
     @property
@@ -164,7 +168,8 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         :return: a unique key which is a human readable path to the module
         """
         key = ''
-        # Key generation for elements which could be imported from other Modules or be implemented locally
+        # Key generation for elements which could be imported from other Modules
+        # or be implemented locally
         if self.yang_type() == 'grouping' or self.yang_type() == 'typedef':
             return self.statement.parent.arg + '/' + self.yang_name()
         # Key generation for all other Statements
@@ -185,11 +190,14 @@ class Typonder(NodeWrapper):
         Constructor for a typonder which extracts the data-type.
 
         :param data_type:
-            string containing the argument of the type attribute of the yang statement
+            string containing the argument of the type attribute of the yang
+            statement
         :param is_build_in_type:
-            boolean indicating is the data_type a yang base type or a typedef type
+            boolean indicating is the data_type a yang base type or a typedef
+            type
         :param enumeration:
-            attribute containing the enumeration object if the data_type is enumeration
+            attribute containing the enumeration object if the data_type is
+            enumeration
         :param union:
             attribute containing the union object if the data_type is union
         """
@@ -198,12 +206,16 @@ class Typonder(NodeWrapper):
         if type_stmt:
             # processing if the yang type is a base type
             if type_stmt.arg in TYPE_PATTERNS:
+                # check whether the data_type is defined by the wool as
+                # language specific type
                 for pattern, wool_type_name in self.WOOL._data_type_patterns.items():
                     if re.match(pattern, type_stmt.arg):
                         self.data_type = wool_type_name
                         break
                 else:
-                    self.data_type = type_stmt.arg
+                    # additional compliance test that the type is a correct
+                    # Yang type
+                    self.data_type = TYPE_PATTERNS[type_stmt.arg]
                 self.is_build_in_type = True
             # processing if the yang type is typedef
             else:
@@ -224,14 +236,22 @@ class Typonder(NodeWrapper):
 
     @template_var
     def default_value(self):
-        # TODO: Add description
+        """
+        Methode that returns the default value of a node if present
+
+        :return: default value as string
+        """
         for item in self.statement.substmts:
             if item.keyword == 'default':
                 return item.arg
 
     @template_var
     def is_mandatory(self):
-        # TODO: Add description
+        """
+        Methodes that returns the True if the node was selected to be
+        mandatory and False if it is not mandatory
+        :return:
+        """
         for item in self.statement.substmts:
             if item.keyword == 'mandatory':
                 return item.arg == 'true'
@@ -246,19 +266,24 @@ class Grouponder(NodeWrapper):
 
     def __init__(self, statement, parent):
         """
-        Constructor for a grouponder which extracts all statements which are childes of the current statement
+        Constructor for a grouponder which extracts all statements which are
+        childes of the current statement
 
-        :param children: all wrapped statements which are children of this statement as list
-        :param uses: if the current statement has a uses substmt a Grouping object created and stored in the uses var
+        :param children: all wrapped statements which are children of this
+                         statement as list
+        :param uses: if the current statement has a uses substmt a Grouping
+                     object created and stored in the uses var
         """
         super().__init__(statement, parent)
         self.uses = OrderedDict()
         self.children = OrderedDict()
 
-        # the following line separates stmts which are imported with 'uses' from normal integrated stmts
+        # the following line separates stmts which are imported with 'uses'
+        # from normal integrated stmts
         children_list = set(getattr(statement, 'i_children', ()))
         if statement.keyword not in ('input', 'output'):
-            children_list.intersection_update(getattr(statement, 'substmts', ()))
+            children_list.intersection_update(
+                getattr(statement, 'substmts', ()))
 
         # wrap all children of the node
         for child in children_list:
@@ -269,7 +294,8 @@ class Grouponder(NodeWrapper):
                 logging.debug("No wrapper for yang type: %s (%s)" %
                               (child.keyword, child.arg))
 
-        # find all stmts which are imported with a 'uses' substmt and wrap the Grouping object related to ths uses
+        # find all stmts which are imported with a 'uses' substmt and wrap the
+        # Grouping object related to ths uses
         for stmt in statement.substmts:
             if stmt.keyword == 'uses':
                 # check is the used grouping already wrapped
@@ -281,9 +307,24 @@ class Grouponder(NodeWrapper):
                     self.WOOL['grouping'](stmt.i_grouping, parent=self))
 
     def __getitem__(self, key):
+        """
+        Methode, that allows to access of the child elements directly as list
+        of the top element
+        :param key: name of the child elements which should be accessed
+        :return: child object
+        """
+
         return self.children[key]
 
     def __getattr__(self, name):
+        """
+        Methode, that allows to access a child element directly due the
+        <parent>.<child> syntax
+
+        :param name: name of the child element
+        :return: child element object
+        """
+
         key = name.replace('_', '-')
         try:
             return self.children[key]
@@ -293,12 +334,19 @@ class Grouponder(NodeWrapper):
                                  .format(self, name, key))
 
     def __dir__(self):
-        return super().__dir__() + [key.replace('-', '_') for key in self.children]
+        """
+        Mathode, that list all child elements as options of the auto completion
+
+        :return: list of elements that are in the children list
+        """
+        return super().__dir__() + [key.replace('-', '_') for key in
+                                    self.children]
 
     @template_var
     def all_children(self):
         """
-        Collects a list of all child stmts of the current stmt regardless of the kind of implementation (local or import).
+        Collects a list of all child stmts of the current stmt regardless of the
+        kind of implementation (local or import).
         :return: list of stmts
         """
         result = OrderedDict(self.children)
@@ -329,16 +377,12 @@ class Leaf(Typonder, yang='leaf'):
 
     :param path: used for leafrefs to store the reference path
     """
+
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         if self.data_type == 'leafref':
-            self.path = next((i.substmts[0].arg for i in statement.substmts if i.keyword == 'type'), None)
-            for i in statement.substmts:
-                if i.keyword == 'type':
-                    self.path = i.substmts[0].arg
-                    break
-            else:
-                self.path = None
+            self.path = next((i.substmts[0].arg for i in statement.substmts if
+                              i.keyword == 'type'), None)
 
 
 class Container(Grouponder, yang='container'):
@@ -392,7 +436,8 @@ class Union(Typonder):
                     self.types[stmt.arg] = TYPE_PATTERNS[stmt.arg]
                 else:
                     key = stmt.parent.arg + '/' + stmt.arg
-                    self.types[stmt.arg] = self.top().derived_types.get(key) or stmt.arg
+                    self.types[stmt.arg] = self.top().derived_types.get(
+                        key) or stmt.arg
 
 
 class TypeDef(Typonder, yang='typedef'):
@@ -409,7 +454,7 @@ class Listonder():
     Metaclass for all List type objects
     """
 
-    def substmt_min_elements(self):
+    def min_list_elements(self):
         """
         Method to return the minimum occurrence of list objects, if the respective substmt is present
 
@@ -419,7 +464,7 @@ class Listonder():
             if i.keyword == 'min-elements':
                 return i.arg
 
-    def substmt_max_elements(self):
+    def max_list_elements(self):
         """
         Method to return the maximum occurrence of list objects, if the respective substmt is present
 
@@ -440,7 +485,8 @@ class LeafList(Typonder, Listonder, yang='leaf-list'):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         if self.data_type == 'leafref':
-            self.path = [i.substmts[0].arg for i in statement.substmts if i.keyword == 'type'][0]
+            self.path = next((i.substmts[0].arg for i in statement.substmts if
+                         i.keyword == 'type'), None)
 
 
 class Grouping(Grouponder, yang='grouping'):
@@ -472,6 +518,7 @@ class Choice(Grouponder, yang='choice'):
 
     :param cases: Dictionary of all possible cases for the choice stmt
     """
+
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.cases = OrderedDict()
@@ -483,6 +530,7 @@ class Case(Grouponder):
     """
     Wrapper class for case statements
     """
+
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
 
@@ -508,6 +556,7 @@ class Input(Grouponder):
     """
     Parser for input nodes.
     """
+
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
 
@@ -516,5 +565,6 @@ class Output(Grouponder):
     """
     Parser for output nodes.
     """
+
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
