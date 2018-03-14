@@ -171,7 +171,7 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         # Key generation for elements which could be imported from other Modules
         # or be implemented locally
         if self.yang_type() == 'grouping' or self.yang_type() == 'typedef':
-            return self.statement.parent.arg + '/' + self.yang_name()
+            return self.statement.parent.arg + "/" + self.yang_name()
         # Key generation for all other Statements
         else:
             if self.parent:
@@ -381,6 +381,9 @@ class Leaf(Typonder, yang='leaf'):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         if self.data_type == 'leafref':
+            type_stmt = statement.search_one('type')
+            if hasattr(type_stmt.i_type_spec, 'i_target_node'):
+                self.reference = self.WOOL['leaf'](type_stmt.i_type_spec.i_target_node, self)
             self.path = next((i.substmts[0].arg for i in statement.substmts if
                               i.keyword == 'type'), None)
 
@@ -485,8 +488,11 @@ class LeafList(Typonder, Listonder, yang='leaf-list'):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         if self.data_type == 'leafref':
+            type_stmt = statement.search_one('type')
+            if hasattr(type_stmt.i_type_spec, 'i_target_node'):
+                self.reference = self.WOOL['leaf'](type_stmt.i_type_spec.i_target_node, self)
             self.path = next((i.substmts[0].arg for i in statement.substmts if
-                         i.keyword == 'type'), None)
+                              i.keyword == 'type'), None)
 
 
 class Grouping(Grouponder, yang='grouping'):
@@ -509,7 +515,7 @@ class List(Grouponder, Listonder, yang='list'):
         super().__init__(statement, parent)
         for i in statement.substmts:
             if i.keyword == 'key':
-                self.key = i.arg
+                self.keys = i.arg
 
 
 class Choice(Grouponder, yang='choice'):
