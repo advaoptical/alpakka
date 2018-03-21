@@ -10,7 +10,7 @@ from alpakka.templates import template_var, create_context
 WOOLS = alpakka.WOOLS
 
 # configuration for logging
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
 TYPE_PATTERNS = OrderedDict([
     ('binary', 'binary'),
@@ -147,6 +147,10 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         return self.statement.keyword
 
     @template_var
+    def yang_module(self):
+        return (self.statement.top or self.statement).i_modulename
+
+    @template_var
     def top(self):
         """
         Find the root wrapper object by walking the tree recursively
@@ -171,13 +175,13 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         # Key generation for elements which could be imported from other Modules
         # or be implemented locally
         if self.yang_type() == 'grouping' or self.yang_type() == 'typedef':
-            return self.statement.parent.arg + "/" + self.yang_name()
+            return self.statement.parent.arg + "/" + self.statement.arg
         # Key generation for all other Statements
         else:
             if self.parent:
-                key = self.parent.generate_key()
+                key = self.parent.generate_key() + '/'
 
-            return key + "/" + self.yang_name()
+            return key + self.yang_name()
 
 
 class Typonder(NodeWrapper):
@@ -241,9 +245,8 @@ class Typonder(NodeWrapper):
 
         :return: default value as string
         """
-        for item in self.statement.substmts:
-            if item.keyword == 'default':
-                return item.arg
+        for item in self.statement.search('default'):
+            return item.arg
 
     @template_var
     def is_mandatory(self):
@@ -252,9 +255,8 @@ class Typonder(NodeWrapper):
         mandatory and False if it is not mandatory
         :return:
         """
-        for item in self.statement.substmts:
-            if item.keyword == 'mandatory':
-                return item.arg == 'true'
+        for item in self.statement.search('mandatory'):
+            return item.arg == 'true'
 
         return False
 
@@ -296,15 +298,14 @@ class Grouponder(NodeWrapper):
 
         # find all stmts which are imported with a 'uses' substmt and wrap the
         # Grouping object related to ths uses
-        for stmt in statement.substmts:
-            if stmt.keyword == 'uses':
-                # check is the used grouping already wrapped
-                # if so, the wrapped grouping is linked in the 'uses' variable
-                # if not a the grouping statement is wrapped
-                key = stmt.i_grouping.parent.arg + '/' + stmt.i_grouping.arg
-                group = self.top().all_nodes.get('grouping', {}).get(key)
-                self.uses[stmt.i_grouping.arg] = group or (
-                    self.WOOL['grouping'](stmt.i_grouping, parent=self))
+        for stmt in statement.search('uses'):
+            # check is the used grouping already wrapped
+            # if so, the wrapped grouping is linked in the 'uses' variable
+            # if not a the grouping statement is wrapped
+            key = stmt.i_grouping.parent.arg + '/' + stmt.i_grouping.arg
+            group = self.top().all_nodes.get('grouping', {}).get(key)
+            self.uses[stmt.i_grouping.arg] = group or (
+                self.WOOL['grouping'](stmt.i_grouping, parent=self))
 
     def __getitem__(self, key):
         """
@@ -397,7 +398,7 @@ class Container(Grouponder, yang='container'):
         super().__init__(statement, parent)
 
 
-class Enum(Typonder):
+class Enum(Typonder, yang='enum'):
     """
     Wrapper class for enum values.
     """
@@ -406,7 +407,7 @@ class Enum(Typonder):
         super().__init__(statement, parent)
 
 
-class Enumeration(Typonder):
+class Enumeration(Typonder, yang='enumeration'):
     """
     Wrapper class for enumeration statements.
 
@@ -417,12 +418,11 @@ class Enumeration(Typonder):
         super().__init__(statement, parent)
         self.enums = OrderedDict()
         # loop through substatements and extract the enum values
-        for stmt in statement.substmts:
-            if stmt.keyword == 'enum':
-                self.enums[stmt.arg] = Enum(stmt, self)
+        for stmt in statement.search('enum'):
+            self.enums[stmt.arg] = self.WOOL['enum'](stmt, self)
 
 
-class Union(Typonder):
+class Union(Typonder, yang='union'):
     """
     Wrapper class for union statements
 
@@ -433,14 +433,23 @@ class Union(Typonder):
         super().__init__(statement, parent)
         # list of types that belong to the union
         self.types = OrderedDict()
-        for stmt in statement.substmts:
-            if stmt.keyword == 'type':
-                if stmt.arg in TYPE_PATTERNS.keys():
-                    self.types[stmt.arg] = TYPE_PATTERNS[stmt.arg]
+        for stmt in statement.search('type'):
+            if stmt.arg in TYPE_PATTERNS.keys():
+                for pattern, wool_type_name in self.WOOL._data_type_patterns.items():
+                    if re.match(pattern, stmt.arg):
+                        self.types[wool_type_name] = wool_type_name
+                        break
                 else:
-                    key = stmt.parent.arg + '/' + stmt.arg
-                    self.types[stmt.arg] = self.top().derived_types.get(
-                        key) or stmt.arg
+                    # additional compliance test that the type is a correct
+                    # Yang type
+                    self.types[stmt.arg] = TYPE_PATTERNS[stmt.arg]
+            elif stmt.arg in self.top().derived_types.keys():
+                key = stmt.arg
+                self.types[stmt.arg] = self.top().derived_types.get(
+                    key) or stmt.arg
+            else:
+                self.types[stmt.arg] = self.WOOL['typedef'](stmt,
+                                                            parent=self.top())
 
 
 class TypeDef(Typonder, yang='typedef'):
@@ -463,9 +472,8 @@ class Listonder():
 
         return: the number of minimum occurrence of list objects
         """
-        for i in self.statement.substmts:
-            if i.keyword == 'min-elements':
-                return i.arg
+        for i in self.statement.search('min-elements'):
+            return i.arg
 
     def max_list_elements(self):
         """
@@ -473,9 +481,8 @@ class Listonder():
 
         return: the number of maximum occurrence of list objects
         """
-        for i in self.statement.substmts:
-            if i.keyword == 'max-elements':
-                return i.arg
+        for i in self.statement.search('max-elements'):
+            return i.arg
 
 
 class LeafList(Typonder, Listonder, yang='leaf-list'):
@@ -513,9 +520,8 @@ class List(Grouponder, Listonder, yang='list'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        for i in statement.substmts:
-            if i.keyword == 'key':
-                self.keys = i.arg
+        for i in statement.search('key'):
+            self.keys = i.arg
 
 
 class Choice(Grouponder, yang='choice'):
@@ -528,11 +534,11 @@ class Choice(Grouponder, yang='choice'):
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
         self.cases = OrderedDict()
-        for case in [i for i in self.statement.substmts if i.keyword == 'case']:
-            self.cases[case.arg] = Case(case, self)
+        for case in self.statement.search('case'):
+            self.cases[case.arg] = self.WOOL['case'](case, self)
 
 
-class Case(Grouponder):
+class Case(Grouponder, yang='case'):
     """
     Wrapper class for case statements
     """
@@ -553,12 +559,12 @@ class RPC(Grouponder, yang='rpc'):
         super().__init__(statement, parent)
         for item in self.statement.i_children:
             if item.keyword == 'input':
-                self.input = Input(item, self)
+                self.input = self.WOOL['input'](item, self)
             elif item.keyword == 'output':
-                self.output = Output(item, self)
+                self.output = self.WOOL['output'](item, self)
 
 
-class Input(Grouponder):
+class Input(Grouponder, yang='input'):
     """
     Parser for input nodes.
     """
@@ -567,7 +573,7 @@ class Input(Grouponder):
         super().__init__(statement, parent)
 
 
-class Output(Grouponder):
+class Output(Grouponder, yang='output'):
     """
     Parser for output nodes.
     """
