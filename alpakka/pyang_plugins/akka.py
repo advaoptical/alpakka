@@ -9,7 +9,7 @@ from IPython import start_ipython
 
 import alpakka
 from alpakka import WOOLS
-from alpakka.wrapper import wrap_module, nodewrapper
+from alpakka.wrapper import wrap_module
 
 
 default_values = {
@@ -163,7 +163,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         self.wool = ctx.opts.wool and WOOLS[ctx.opts.wool]
         # set package prefix
         if ctx.opts.akka_prefix:
-            nodewrapper.NodeWrapper.prefix = ctx.opts.akka_prefix
+            self.wool.prefix = ctx.opts.akka_prefix
         # set output path
         if ctx.opts.akka_output:
             self.output_path = ctx.opts.akka_output
@@ -205,6 +205,7 @@ class AkkaPlugin(plugin.PyangPlugin):
                                {'%sBackend' % module.java_name: rpc_dict})
             self.fill_template('routes.jinja',
                                {'%sRoutes' % module.java_name: rpc_dict})
+            self.generate_pom('pom.jinja',module)
 
     def fill_template(self, template_name, description_dict):
         """
@@ -219,7 +220,7 @@ class AkkaPlugin(plugin.PyangPlugin):
             else:
                 subpath = context['path']
             # get the output path for the file
-            output_path = "%s/%s" % (self.output_path, subpath)
+            output_path = "%s/%s/%s" % (self.output_path, 'src', subpath)
             # create folder if not available
             if not os.path.exists(output_path):
                 os.makedirs(output_path)
@@ -231,3 +232,20 @@ class AkkaPlugin(plugin.PyangPlugin):
             with open("%s/%s.java" % (output_path, key), 'w', encoding="utf-8",
                       newline="\n") as f:
                 f.write(output)
+
+    def generate_pom(self, template_name, description_dict):
+
+        template = self.env.get_template(template_name)
+        # get the output path for the file
+        output_path = "%s" % (self.output_path)
+        # create folder if not available
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        # render the template
+        output = template.render(ctx=description_dict, name='')
+        # print the output for debugging
+        logging.debug(output)
+        # write to file
+        with open("%s/%s.xml" % (output_path, 'pom'), 'w', encoding="utf-8",
+                  newline="\n") as f:
+            f.write(output)

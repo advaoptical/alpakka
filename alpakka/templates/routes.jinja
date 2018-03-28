@@ -34,7 +34,7 @@ public class {{ name }} extends AllDirectives {
   {%- if rpc.input and rpc.input.vars %}
   public static class Rpc{{ name | firstupper }} {
     {%- for name, input in rpc.input.vars.items() %}
-    @JsonProperty("{{ input.name }}")
+    @JsonProperty("{{ input.yang_name() }}")
     public {{ input.java_type }} {{ name }};
     {%- endfor %}
   }

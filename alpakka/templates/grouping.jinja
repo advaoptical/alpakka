@@ -29,11 +29,11 @@ public class {{ name }} {% if ctx.uses|length == 1 %}extends {{ ctx.uses.keys() 
   public {{ name }} (
     {%- if ctx.uses|length == 1 -%}
     {% for key, var in ctx.inherited_vars().items() -%}
-      @JsonProperty("{{ var.name }}") {{ var.java_type }} {{ key }}{% if not loop.last -%},
+      @JsonProperty("{{ var.yang_name() }}") {{ var.java_type }} {{ key }}{% if not loop.last -%},
     {% endif %}
     {%- endfor %}{% if ctx.vars %},{% endif %}{% endif %}
     {% for key, var in ctx.vars.items() -%}
-      @JsonProperty("{{ var.name }}") {{ var.java_type }} {{ key }}
+      @JsonProperty("{{ var.yang_name() }}") {{ var.java_type }} {{ key }}
     {%- if not loop.last -%},
     {% endif %}
     {%- endfor %}){
@@ -48,7 +48,7 @@ public class {{ name }} {% if ctx.uses|length == 1 %}extends {{ ctx.uses.keys() 
   }
 
 {% for key, var in ctx.vars.items() %}
-  @JsonProperty("{{ var.name }}")
+  @JsonProperty("{{ var.yang_name() }}")
   public {{ var.java_type }} get{{ key|firstupper() }}(){
     return this.{{ key }};
   }

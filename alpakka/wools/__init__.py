@@ -76,6 +76,7 @@ class Wool(str):
         self.name = name
         self.package = package
         self.parent = parent
+        self.prefix = ''
 
         self._data_type_patterns = (parent and
                                     dict(parent._data_type_patterns) or {})
