@@ -77,6 +77,8 @@ class Wool(str):
         self.package = package
         self.parent = parent
         self.prefix = ''
+        self.output_path = ''
+        self.beans_only = False
 
         self._data_type_patterns = (parent and
                                     dict(parent._data_type_patterns) or {})
