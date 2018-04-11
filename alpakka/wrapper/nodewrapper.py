@@ -35,6 +35,12 @@ TYPE_PATTERNS = OrderedDict([
 ])
 
 
+def collect_imported_children(statement, children_list):
+    for grouping in statement.search('uses'):
+        collect_imported_children(grouping.i_grouping, children_list)
+    children_list.update(set(getattr(statement, 'i_children', ())))
+
+
 class NodeWrapperMeta(type):
     """
     Metaclass for :class:`NodeWrapper`
@@ -283,9 +289,16 @@ class Grouponder(NodeWrapper):
         # the following line separates stmts which are imported with 'uses'
         # from normal integrated stmts
         children_list = set(getattr(statement, 'i_children', ()))
-        if statement.keyword not in ('input', 'output'):
-            children_list.intersection_update(
-                getattr(statement, 'substmts', ()))
+        import_list = set()
+
+        for grouping in statement.search('uses'):
+            collect_imported_children(grouping.i_grouping, import_list)
+
+        for item in import_list:
+            for child in children_list:
+                if child.arg == item.arg:
+                    children_list.remove(child)
+                    break
 
         # wrap all children of the node
         for child in children_list:
@@ -304,8 +317,11 @@ class Grouponder(NodeWrapper):
             # if not a the grouping statement is wrapped
             key = stmt.i_grouping.parent.arg + '/' + stmt.i_grouping.arg
             group = self.top().all_nodes.get('grouping', {}).get(key)
-            self.uses[stmt.i_grouping.arg] = group or (
-                self.WOOL['grouping'](stmt.i_grouping, parent=self))
+            if group:
+                self.uses[group.yang_name()] = group
+            else:
+                self.uses[stmt.i_grouping.arg] = \
+                    self.WOOL['grouping'](stmt.i_grouping, parent=self.top())
 
     def __getitem__(self, key):
         """
@@ -370,6 +386,9 @@ class Module(Grouponder, yang='module'):
         self.all_nodes = {}
         self.derived_types = OrderedDict()
         super().__init__(statement, parent)
+        # if self.statement.search_one('augment'):
+        #     container = self.statement.search_one('augment').i_target_node
+        #     self.WOOL.get(container.keyword)(container, self)
 
 
 class Leaf(Typonder, yang='leaf'):
