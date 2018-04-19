@@ -34,13 +34,6 @@ TYPE_PATTERNS = OrderedDict([
     ('union', 'union')
 ])
 
-
-def collect_imported_children(statement, children_list):
-    for grouping in statement.search('uses'):
-        collect_imported_children(grouping.i_grouping, children_list)
-    children_list.update(set(getattr(statement, 'i_children', ())))
-
-
 class NodeWrapperMeta(type):
     """
     Metaclass for :class:`NodeWrapper`
@@ -289,16 +282,15 @@ class Grouponder(NodeWrapper):
         # the following line separates stmts which are imported with 'uses'
         # from normal integrated stmts
         children_list = set(getattr(statement, 'i_children', ()))
-        import_list = set()
 
-        for grouping in statement.search('uses'):
-            collect_imported_children(grouping.i_grouping, import_list)
+        if statement.keyword not in ('input', 'output'):
+            children_list.intersection_update(
+                getattr(statement, 'substmts', ()))
 
-        for item in import_list:
-            for child in children_list:
-                if child.arg == item.arg:
-                    children_list.remove(child)
-                    break
+        if getattr(statement, 'i_children', ()):
+            for child in statement.i_children:
+                if hasattr(child, 'i_augment') and not hasattr(child, 'i_uses'):
+                    children_list.add(child)
 
         # wrap all children of the node
         for child in children_list:
@@ -311,7 +303,12 @@ class Grouponder(NodeWrapper):
 
         # find all stmts which are imported with a 'uses' substmt and wrap the
         # Grouping object related to ths uses
-        for stmt in statement.search('uses'):
+        uses_list = set(statement.search('uses'))
+        for child in set(getattr(statement, 'i_children', ())):
+            if hasattr(child, 'i_augment') and hasattr(child, 'i_uses'):
+                uses_list.update(child.i_uses)
+
+        for stmt in uses_list:
             # check is the used grouping already wrapped
             # if so, the wrapped grouping is linked in the 'uses' variable
             # if not a the grouping statement is wrapped
