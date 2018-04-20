@@ -34,6 +34,7 @@ TYPE_PATTERNS = OrderedDict([
     ('union', 'union')
 ])
 
+
 class NodeWrapperMeta(type):
     """
     Metaclass for :class:`NodeWrapper`
@@ -128,7 +129,8 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
             elif stmt.keyword == 'config':
                 self.config = stmt.arg.lower() == 'true'
         if self.top() is not self and self.yang_type() not in ('enum', 'input',
-                                                             'output', 'type'):
+                                                               'output',
+                                                               'type'):
             nodes = self.top().all_nodes.setdefault(statement.keyword,
                                                     OrderedDict())
             nodes[self.generate_key()] = self
@@ -400,7 +402,8 @@ class Leaf(Typonder, yang='leaf'):
         if self.data_type == 'leafref':
             type_stmt = statement.search_one('type')
             if hasattr(type_stmt.i_type_spec, 'i_target_node'):
-                self.reference = self.WOOL['leaf'](type_stmt.i_type_spec.i_target_node, self)
+                self.reference = self.WOOL['leaf'](
+                    type_stmt.i_type_spec.i_target_node, self)
             self.path = next((i.substmts[0].arg for i in statement.substmts if
                               i.keyword == 'type'), None)
 
@@ -513,7 +516,8 @@ class LeafList(Typonder, Listonder, yang='leaf-list'):
         if self.data_type == 'leafref':
             type_stmt = statement.search_one('type')
             if hasattr(type_stmt.i_type_spec, 'i_target_node'):
-                self.reference = self.WOOL['leaf'](type_stmt.i_type_spec.i_target_node, self)
+                self.reference = self.WOOL['leaf'](
+                    type_stmt.i_type_spec.i_target_node, self)
             self.path = next((i.substmts[0].arg for i in statement.substmts if
                               i.keyword == 'type'), None)
 
@@ -531,13 +535,17 @@ class List(Grouponder, Listonder, yang='list'):
     """
     Wrapper class for list statements.
 
-    :param key: key contains value which is originally stored in the key substmt of an yang list stmt
+    :param keys: the values originally stored in the key substmt of an yang list stmt
     """
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        for i in statement.search('key'):
-            self.keys = i.arg
+        self.keys = set()
+        key_stmt = statement.search_one('key')
+        if key_stmt is not None and key_stmt.arg is not None:
+            # the key statement contains a space separated list of keys
+            for key in key_stmt.arg.split():
+                self.keys.add(key)
 
 
 class Choice(Grouponder, yang='choice'):
