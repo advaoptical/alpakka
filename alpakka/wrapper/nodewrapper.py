@@ -285,15 +285,6 @@ class Grouponder(NodeWrapper):
         # from normal integrated stmts
         children_list = set(getattr(statement, 'i_children', ()))
 
-        if statement.keyword not in ('input', 'output'):
-            children_list.intersection_update(
-                getattr(statement, 'substmts', ()))
-
-        if getattr(statement, 'i_children', ()):
-            for child in statement.i_children:
-                if hasattr(child, 'i_augment') and not hasattr(child, 'i_uses'):
-                    children_list.add(child)
-
         # wrap all children of the node
         for child in children_list:
             child_wrapper = self.WOOL.get(child.keyword)
