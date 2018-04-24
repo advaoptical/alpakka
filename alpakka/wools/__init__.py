@@ -1,7 +1,5 @@
-from functools import lru_cache
 from pprint import pformat
 
-import pluggy
 from pkg_resources import iter_entry_points
 
 from alpakka.logger import LOGGER
@@ -41,30 +39,26 @@ def register(registry, name, package, parent=None, data_type_patterns=None):
                      this Wool
     """
     if parent:
-        parent = parent.lower()
-        parentwool = registry[parent]
+        parentwool = registry[parent.lower()]
     else:
         parentwool = registry.default
 
     wool = Wool(name, package, parent=parentwool,
                 data_type_patterns=data_type_patterns)
-    registry.pluggy_manager.register(package, wool)
+    registry.register(package, wool)
 
     LOGGER.info("Registered {!r}".format(wool))
     return wool
 
 
-class Wool(str):
+class Wool(object):
     """
     The wool handler that stores the wool's name, its python package name,
     and an optional parent :class:`Wool` instance
 
     For case-insentitive lookups, a normalized identification name for the
-    wool is created by lowering the wool name and stored via the ``str`` base
+    wool is created by lowering the wool's name
     """
-
-    def __new__(cls, name, package, parent=None, data_type_patterns=None):
-        return str.__new__(cls, name.lower())
 
     def __init__(self, name, package, parent=None, data_type_patterns=None):
         """
@@ -87,30 +81,30 @@ class Wool(str):
 
         self._yang_wrappers = parent and dict(parent._yang_wrappers) or {}
 
-    @lru_cache()
+    def id(self):
+        """
+        :return: the wool's identifier (lower case name)
+        """
+        return self.name.lower()
+
     def _selfify(self, wrapcls):
         """
         Check if ``.WOOL`` reference of given
         :class:`alpakka.NodeWrapper`-derived `wrapcls` is `self`, and if not,
-        then create a cached derived class with overridden ``.WOOL`` reference
+        override the ``.WOOL`` reference
 
-        :return: given `wrapcls` or derived class
+        :return: given `wrapcls` with correct ``.WOOL`` reference
         """
-        if wrapcls.WOOL is self:
-            return wrapcls
-
-        class Wrapper(wrapcls):
-            WOOL = self
-
-        return Wrapper
+        if wrapcls.WOOL is not self:
+            wrapcls.WOOL = self
+        return wrapcls
 
     def __getitem__(self, name):
         """
         Get the Wool's YANG node wrapper class for given YANG statement `name`
 
         If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, a cached derived class with overriden
-        ``.WOOL`` will be created
+        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
         """
         return self._selfify(self._yang_wrappers[name])
 
@@ -121,8 +115,7 @@ class Wool(str):
         exception
 
         If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, a cached derived class with overriden
-        ``.WOOL`` will be created
+        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
         """
         wrapcls = self._yang_wrappers.get(name)
         if wrapcls is not None:
@@ -134,8 +127,7 @@ class Wool(str):
         instead of YANG statement name
 
         If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, a cached derived class with overriden
-        ``.WOOL`` will be created
+        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
         """
         for wrapcls in self._yang_wrappers.values():
             if wrapcls.__name__ == name:
@@ -148,8 +140,8 @@ class Wool(str):
         Extend basic ``__dir__`` with all YANG node wrapper class names of
         this Wool, for use with :meth:`.__getattr__`
         """
-        return super().__dir__() + [
-            wrapcls.__name__ for wrapcls in self._yang_wrappers.values()]
+        return super().__dir__() + [wrapcls.__name__ for wrapcls in
+                                    self._yang_wrappers.values()]
 
     def __repr__(self):
         """
@@ -168,45 +160,49 @@ class WoolsRegistry:
     the latter for more information about that process. It also explains how
     to access the registered :class:`alpakka.Wool` instances later
 
-    The manager wraps a ``pluggy.PluginManager``, and every wool is internally
-    registered as a ``pluggy`` plugin with the normalized all-lowercased wool
-    name (wool identification name) as plugin name
+    The manager registers every wool with the normalized all-lowercased wool
+    name (wool id) as plugin name
     """
 
     def __init__(self):
-        self.pluggy_manager = pluggy.PluginManager('alpakka')
+        self.wools = dict()
+
+    def register(self, package, wool):
+        """
+        Registers the wool together with its python package
+        :param package: the wool's python package
+        :param wool: the wool
+        """
+        self.wools[package] = wool
 
     def items(self):
         """
-        Iterates ``(<wool id name>, <alpakka.Wool instance>)`` pairs
+        Iterates ``(<wool id>, <alpakka.Wool instance>)`` pairs
         """
-        for package in self.pluggy_manager.get_plugins():
-            wool = self.pluggy_manager.get_name(package)
-            yield str(wool), wool
+        for wool in self.wools.items():
+            yield wool.id(), wool
 
     def names(self):
         """
         Iterates names of registered wools
         """
-        for package in self.pluggy_manager.get_plugins():
-            wool = self.pluggy_manager.get_name(package)
+        for wool in self.wools.items():
             yield wool.name
 
     def packages(self):
         """
         Iterates python package names of registered wools
         """
-        yield from self.pluggy_manager.get_plugins()
+        yield from self.wools.keys()
 
     def __contains__(self, name_or_package):
         """
         Checks if given string is either a name or a python package name of
         any registered wool, whereby name lookup is case-insensitive
         """
-        for package in self.pluggy_manager.get_plugins():
+        for package, wool in self.wools.items():
             if name_or_package == package or (
-                    name_or_package.lower() ==
-                    self.pluggy_manager.get_name(package)):
+                    name_or_package.lower() == wool.id()):
                 return True
 
         return False
@@ -216,15 +212,13 @@ class WoolsRegistry:
         Get a registered :class:`alpakka.Wool` instance by either its name or
         its python package name, whereby name lookup is case-insensitive
         """
-        wool = self.pluggy_manager.get_name(name_or_package)
+        wool = self.wools.get(name_or_package)
         if wool:
             return wool
 
-        package = self.pluggy_manager.get_plugin(name_or_package.lower())
-        if package:
-            wool = self.pluggy_manager.get_name(package)
-            if wool:
-                return wool
+        for i_wool in self.wools.values():
+            if i_wool.id() == name_or_package.lower():
+                return i_wool
 
         raise KeyError(name_or_package)
 
