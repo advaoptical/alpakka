@@ -154,6 +154,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         else:
             for module in wrapped_modules:
                 module.generate_classes()
+            self.wool.generate_commons(wrapped_modules)
 
     def get_options(self, ctx):
         """

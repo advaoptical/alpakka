@@ -4,6 +4,8 @@ from pkg_resources import iter_entry_points
 
 from alpakka.logger import LOGGER
 
+from jinja2 import Environment, PackageLoader
+
 __all__ = ['Wool', 'register']
 
 
@@ -70,7 +72,7 @@ class Wool(object):
         self.name = name
         self.package = package
         self.parent = parent
-        self.prefix = ''
+        self.prefix = 'com.example'
         self.output_path = ''
         self.beans_only = False
 
@@ -151,6 +153,19 @@ class Wool(object):
             type(self).__qualname__, self.name, self.package,
             self.parent and self.parent.name)
 
+    def generate_commons(self, wrapped_modules, beans_only=False):
+
+        env = next(iter(wrapped_modules)).env
+
+        template = env.get_template('master_pom.jinja')
+        name = next(iter(wrapped_modules)).yang_module().split('-', 1)[0]
+        prefix = self.prefix
+        output = template.render(ctx=wrapped_modules,
+                                 name=name,
+                                 prefix=prefix)
+        with open("%s/%s.xml" % (self.output_path, 'pom'), 'w', encoding="utf-8",
+                  newline="\n") as f:
+            f.write(output)
 
 class WoolsRegistry:
     """
