@@ -121,6 +121,13 @@ class AkkaPlugin(plugin.PyangPlugin):
                 help="run alpakka in interactive mode by starting an IPython "
                      "shell before template generation"
             ),
+            optparse.make_option(
+                "--java-interface-levels", action="store", dest="iface_levels",
+                type="int", default=2,
+                help="choose the number of levels of the tree that are covered "
+                     "by methods in the generated interface before switching "
+                     "to reflection "
+            )
         ]
         group = optparser.add_option_group("Akka output specific options")
         group.add_options(options)
@@ -168,6 +175,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         if ctx.opts.akka_output:
             self.wool.output_path = ctx.opts.akka_output
         self.wool.beans_only = ctx.opts.beans_only
+        self.wool.iface_levels = ctx.opts.iface_levels
 
     def render_template(self, template_name, context):
         template = self.env.get_template(template_name)
