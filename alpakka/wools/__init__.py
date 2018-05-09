@@ -153,9 +153,9 @@ class Wool(object):
             type(self).__qualname__, self.name, self.package,
             self.parent and self.parent.name)
 
-    def generate_commons(self, wrapped_modules, beans_only=False):
+    def generate_commons(self, wrapped_modules):
 
-        env = next(iter(wrapped_modules)).env
+        env = next(iter(wrapped_modules.values())).env
 
         template = env.get_template('master_pom.jinja')
         name = next(iter(wrapped_modules)).yang_module().split('-', 1)[0]
