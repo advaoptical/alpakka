@@ -21,12 +21,12 @@ To uses the project it is required to install python version 3.5 or newer, pytho
 	git clone http://mgn-s-at-source.advaoptical.com/gitlab/anden/wools.git
 	
 * The next step is to install both projects and the required dependencies. It is recommended to install first the *wools* project and afterwards the *alpakka* project.
-
+    '''
 	cd alpakka
 	pip install .
 	cd ../wools
 	pip install .
-	
+    '''	
 * After the installation of both projects is finished it is recommended to check are some importent packages installed in the correct version. The following command displayes all installed python packages
 
 	pip list
