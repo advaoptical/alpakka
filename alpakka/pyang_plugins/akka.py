@@ -141,25 +141,41 @@ class AkkaPlugin(plugin.PyangPlugin):
             for module_details, context_module in module.i_ctx.modules.items():
                 unique_modules.add(context_module)
         # wrap unique modules
-        wrapped_modules = []
+        wrapped_modules = dict()
         for module in unique_modules:
             if module.i_children:
                 logging.info("Wrapping module %s (%s)",
                              module.arg, module.i_latest_revision)
                 # wrap module statement
-                wrapped_modules.append(wrap_module(module, wool=self.wool))
+                wrapped_module = wrap_module(module, wool=self.wool)
+                wrapped_modules[wrapped_module.yang_module()] = wrapped_module
             else:
                 logging.info("No children in module %s (%s)",
                              module.arg, module.i_latest_revision)
+        # delete class duplications
+        duplications = dict()
+        for module in wrapped_modules.values():
+            for child in module.classes.keys():
+                duplications.setdefault(child, [])
+                duplications[child].append(module)
+        for module in wrapped_modules.values():
+            for name, child in set(module.classes.items()):
+                if child.statement.i_orig_module.arg != module.yang_module():
+                    if name in wrapped_modules[child.statement.i_orig_module.arg].classes:
+                        module.classes.pop(name)
+                    else:
+                        wrapped_modules[child.statement.i_orig_module.arg].classes[name] = child
+                        module.classes.pop(name)
+
         if ctx.opts.interactive:
             start_ipython([], user_ns=dict(
                 ((module.statement.arg.replace('-', '_'), module)
-                 for module in wrapped_modules),
+                 for module in wrapped_modules.values()),
                 alpakka=alpakka,
                 render_template=self.render_template,
             ))
         else:
-            for module in wrapped_modules:
+            for module in wrapped_modules.values():
                 module.generate_classes()
             self.wool.generate_commons(wrapped_modules)
 
