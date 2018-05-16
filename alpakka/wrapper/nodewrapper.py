@@ -214,7 +214,8 @@ class Typonder(NodeWrapper):
             if type_stmt.arg in TYPE_PATTERNS:
                 # check whether the data_type is defined by the wool as
                 # language specific type
-                for pattern, wool_type_name in self.WOOL._data_type_patterns.items():
+                data_type_paterns = self.WOOL._data_type_patterns.items()
+                for pattern, wool_type_name in data_type_paterns:
                     if re.match(pattern, type_stmt.arg):
                         self.data_type = wool_type_name
                         break
@@ -324,7 +325,7 @@ class Grouponder(NodeWrapper):
                     # Handling for Groupings which are imported with
                     # a augment statement
                     for stmt in set(statement.search('uses')):
-                        key = stmt.i_grouping.parent.arg + '/' +\
+                        key = stmt.i_grouping.parent.arg + '/' + \
                               stmt.i_grouping.arg
                         group = self.top().all_nodes.get('grouping', {}).get(
                             key)
@@ -392,8 +393,10 @@ class Module(Grouponder, yang='module'):
         """
         Constructor for Class objects for module statements
 
-        :param modules: Dictionary of classes of yang statements, where each class is a dictionary of all wrapped statements of the current module
-        :param derived_types: Dictionary of all type defs which are used inside this module
+        :param modules: Dictionary of classes of yang statements, where each
+        class is a dictionary of all wrapped statements of the current module
+        :param derived_types: Dictionary of all type defs which are used inside
+        this module
         """
         self.all_nodes = {}
         self.derived_types = OrderedDict()
@@ -458,7 +461,8 @@ class Union(Typonder, yang='union'):
     """
     Wrapper class for union statements
 
-    :param types: Dictionary to store all types which are part of the union, stored as string or wrapped statement object
+    :param types: Dictionary to store all types which are part of the union,
+    stored as string or wrapped statement object
     """
 
     def __init__(self, statement, parent):
@@ -467,7 +471,8 @@ class Union(Typonder, yang='union'):
         self.types = OrderedDict()
         for stmt in statement.search('type'):
             if stmt.arg in TYPE_PATTERNS.keys():
-                for pattern, wool_type_name in self.WOOL._data_type_patterns.items():
+                for pattern, wool_type_name in self.WOOL._data_type_patterns.\
+                        items():
                     if re.match(pattern, stmt.arg):
                         self.types[wool_type_name] = wool_type_name
                         break
@@ -500,7 +505,8 @@ class Listonder():
 
     def min_list_elements(self):
         """
-        Method to return the minimum occurrence of list objects, if the respective substmt is present
+        Method to return the minimum occurrence of list objects, if the
+        respective substmt is present
 
         return: the number of minimum occurrence of list objects
         """
@@ -509,7 +515,8 @@ class Listonder():
 
     def max_list_elements(self):
         """
-        Method to return the maximum occurrence of list objects, if the respective substmt is present
+        Method to return the maximum occurrence of list objects, if the
+        respective substmt is present
 
         return: the number of maximum occurrence of list objects
         """
@@ -548,7 +555,8 @@ class List(Grouponder, Listonder, yang='list'):
     """
     Wrapper class for list statements.
 
-    :param keys: the values originally stored in the key substmt of an yang list stmt
+    :param keys: the values originally stored in the key substmt of an yang
+    list stmt
     """
 
     def __init__(self, statement, parent):
