@@ -123,6 +123,7 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
 
         self.statement = statement
         self.parent = parent
+        self.is_augmented = False
         for stmt in statement.substmts:
             if stmt.keyword == 'description' and stmt.arg.lower() != "none":
                 self.description = stmt.arg
@@ -297,10 +298,6 @@ class Grouponder(NodeWrapper):
         # find all stmts which are imported with a 'uses' substmt and wrap the
         # Grouping object related to ths uses
         uses_list = set(statement.search('uses'))
-        for child in set(getattr(statement, 'i_children', ())):
-            if hasattr(child, 'i_augment') and hasattr(child, 'i_uses'):
-                uses_list.update(child.i_uses)
-
         for stmt in uses_list:
             # check is the used grouping already wrapped
             # if so, the wrapped grouping is linked in the 'uses' variable
@@ -312,6 +309,31 @@ class Grouponder(NodeWrapper):
             else:
                 self.uses[stmt.i_grouping.arg] = \
                     self.WOOL['grouping'](stmt.i_grouping, parent=self.top())
+
+        # special handling for augment imports
+        # collect all keys of augments
+
+        augmented_keys = []
+
+        for child in set(getattr(statement, 'i_children', ())):
+            if hasattr(child, 'i_augment'):
+                self.is_augmented = True
+                statement = child.i_augment
+                if statement.parent.arg not in augmented_keys:
+                    augmented_keys.append(statement.parent.arg)
+                    # Handling for Groupings which are imported with
+                    # a augment statement
+                    for stmt in set(statement.search('uses')):
+                        key = stmt.i_grouping.parent.arg + '/' +\
+                              stmt.i_grouping.arg
+                        group = self.top().all_nodes.get('grouping', {}).get(
+                            key)
+                        if group:
+                            self.uses[group.yang_name()] = group
+                        else:
+                            self.uses[stmt.i_grouping.arg] = \
+                                self.WOOL['grouping'](stmt.i_grouping,
+                                                      parent=self.top())
 
     def __getitem__(self, key):
         """
