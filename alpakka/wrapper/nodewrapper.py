@@ -240,6 +240,13 @@ class Typonder(NodeWrapper):
             # special processing if the data_type is an union
             elif self.data_type == 'union':
                 self.union = Union(type_stmt, parent=self)
+            elif self.data_type == 'leafref':
+                if hasattr(type_stmt.i_type_spec, 'i_target_node'):
+                    self.reference = self.WOOL['leaf'](
+                        type_stmt.i_type_spec.i_target_node, self)
+                self.path = next(
+                    (i.substmts[0].arg for i in statement.substmts if
+                     i.keyword == 'type'), None)
 
     @template_var
     def default_value(self):
@@ -415,13 +422,6 @@ class Leaf(Typonder, yang='leaf'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        if self.data_type == 'leafref':
-            type_stmt = statement.search_one('type')
-            if hasattr(type_stmt.i_type_spec, 'i_target_node'):
-                self.reference = self.WOOL['leaf'](
-                    type_stmt.i_type_spec.i_target_node, self)
-            self.path = next((i.substmts[0].arg for i in statement.substmts if
-                              i.keyword == 'type'), None)
 
 
 class Container(Grouponder, yang='container'):
@@ -533,13 +533,6 @@ class LeafList(Typonder, Listonder, yang='leaf-list'):
 
     def __init__(self, statement, parent):
         super().__init__(statement, parent)
-        if self.data_type == 'leafref':
-            type_stmt = statement.search_one('type')
-            if hasattr(type_stmt.i_type_spec, 'i_target_node'):
-                self.reference = self.WOOL['leaf'](
-                    type_stmt.i_type_spec.i_target_node, self)
-            self.path = next((i.substmts[0].arg for i in statement.substmts if
-                              i.keyword == 'type'), None)
 
 
 class Grouping(Grouponder, yang='grouping'):
