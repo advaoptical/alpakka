@@ -323,24 +323,24 @@ class Grouponder(NodeWrapper):
 
         augmented_keys = []
 
-        for child in set(getattr(statement, 'i_children', ())):
-            if hasattr(child, 'i_augment'):
+        for children in set(getattr(statement, 'i_children', ())):
+            if hasattr(children, 'i_augment'):
                 self.is_augmented = True
-                statement = child.i_augment
-                if statement.parent.arg not in augmented_keys:
-                    augmented_keys.append(statement.parent.arg)
+                augment_stmt = children.i_augment
+                if augment_stmt.parent.arg not in augmented_keys:
+                    augmented_keys.append(augment_stmt.parent.arg)
                     # Handling for Groupings which are imported with
                     # a augment statement
-                    for stmt in set(statement.search('uses')):
-                        key = stmt.i_grouping.parent.arg + '/' + \
-                              stmt.i_grouping.arg
-                        group = self.top().all_nodes.get('grouping', {}).get(
-                            key)
+                    for grp in set(augment_stmt.search('uses')):
+                        key = grp.parent.arg[1:] + '/' + \
+                              grp.arg
+                        group = self.top().all_nodes.get('grouping', {}).\
+                            get(key)
                         if group:
                             self.uses[group.yang_name()] = group
                         else:
-                            self.uses[stmt.i_grouping.arg] = \
-                                self.WOOL['grouping'](stmt.i_grouping,
+                            self.uses[grp.arg] = \
+                                self.WOOL['grouping'](grp,
                                                       parent=self.top())
 
     def __getitem__(self, key):
