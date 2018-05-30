@@ -79,14 +79,6 @@ class AkkaPlugin(plugin.PyangPlugin):
 
     def __init__(self):
         super().__init__()
-        self.prefix = ""
-        self.output_path = ""
-        # prepare environment
-        self.env = Environment(loader=PackageLoader('alpakka'))
-        # add filters to environment
-        self.env.filters['firstupper'] = firstupper
-        self.env.filters['firstlower'] = firstlower
-        self.env.filters['javadefault'] = java_default
 
     def add_output_format(self, fmts):
         self.multiple_modules = True
@@ -103,17 +95,8 @@ class AkkaPlugin(plugin.PyangPlugin):
                 help="The Wool to use for knitting the code"
             ),
             optparse.make_option(
-                "--akka-output-path", dest="akka_output", action="store",
+                "--output-path", dest="akka_output", action="store",
                 help="output path for the generated classes"
-            ),
-            optparse.make_option(
-                "--akka-package-prefix", dest="akka_prefix", action="store",
-                help="package prefix to be prepended to the generated classes"
-            ),
-            optparse.make_option(
-                "--akka-beans-only", action="store_true", dest="beans_only",
-                default=False,
-                help="create just the beans without the akka classes"
             ),
             optparse.make_option(
                 "-i", "--interactive", action="store_true", dest="interactive",
@@ -122,11 +105,8 @@ class AkkaPlugin(plugin.PyangPlugin):
                      "shell before template generation"
             ),
             optparse.make_option(
-                "--java-interface-levels", action="store", dest="iface_levels",
-                type="int", default=2,
-                help="choose the number of levels of the tree that are covered "
-                     "by methods in the generated interface before switching "
-                     "to reflection "
+                "--configuration-file-location", action="store",
+                dest="config_file", help="path for the wool configuration file"
             )
         ]
         group = optparser.add_option_group("Akka output specific options")
@@ -167,18 +147,8 @@ class AkkaPlugin(plugin.PyangPlugin):
                 render_template=self.render_template,
             ))
         else:
-            try:
-                for module in wrapped_modules.values():
-                    module.generate_classes()
-            except AttributeError:
-                logging.error("The method generate_classes is not implemented")
-                logging.info("Entering interactive mode")
-                start_ipython([], user_ns=dict(
-                    ((module.statement.arg.replace('-', '_'), module)
-                     for module in wrapped_modules.values()),
-                    alpakka=alpakka,
-                    render_template=self.render_template,
-                ))
+            for wrapped_module in wrapped_modules.values():
+                self.wool.generate_output(wrapped_module)
 
     def get_options(self, ctx):
         """
@@ -186,14 +156,10 @@ class AkkaPlugin(plugin.PyangPlugin):
         :param ctx: the context
         """
         self.wool = ctx.opts.wool and WOOLS[ctx.opts.wool] or WOOLS.default
-        # set package prefix
-        if ctx.opts.akka_prefix:
-            self.wool.prefix = ctx.opts.akka_prefix
         # set output path
         if ctx.opts.akka_output:
             self.wool.output_path = ctx.opts.akka_output
-        self.wool.beans_only = ctx.opts.beans_only
-        self.wool.iface_levels = ctx.opts.iface_levels
+        self.wool.parse_config(ctx.opts.config_file)
 
     def render_template(self, template_name, context):
         template = self.env.get_template(template_name)

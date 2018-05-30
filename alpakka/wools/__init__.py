@@ -1,4 +1,9 @@
+from path import Path
 from pprint import pformat
+from importlib import import_module
+from argparse import ArgumentParser
+
+import configparser
 
 from pkg_resources import iter_entry_points
 
@@ -28,7 +33,8 @@ def load_from_entry_points():
         woolpoint.load()
 
 
-def register(registry, name, package, parent=None, data_type_patterns=None):
+def register(registry, name, package, parent=None, data_type_patterns=None,
+             options=None):
     """
     Creates a new :class:`alpakka.Wool` instance and adds it to the
     given `registry`
@@ -46,7 +52,7 @@ def register(registry, name, package, parent=None, data_type_patterns=None):
         parentwool = registry.default
 
     wool = Wool(name, package, parent=parentwool,
-                data_type_patterns=data_type_patterns)
+                data_type_patterns=data_type_patterns, options=options)
     registry.register(package, wool)
 
     LOGGER.info("Registered {!r}".format(wool))
@@ -62,7 +68,8 @@ class Wool(object):
     wool is created by lowering the wool's name
     """
 
-    def __init__(self, name, package, parent=None, data_type_patterns=None):
+    def __init__(self, name, package, parent=None, data_type_patterns=None,
+                 options=None):
         """
         :param name:    The wool's name
         :param package: The wool's fully-qualified python package name
@@ -72,10 +79,8 @@ class Wool(object):
         self.name = name
         self.package = package
         self.parent = parent
-        self.prefix = 'com.example'
         self.output_path = ''
-        self.beans_only = False
-
+        self.config = {}
         self._data_type_patterns = (parent and
                                     dict(parent._data_type_patterns) or {})
         if data_type_patterns is not None:
@@ -152,6 +157,25 @@ class Wool(object):
         return "{}({!r}, {!r}, parent={!r})".format(
             type(self).__qualname__, self.name, self.package,
             self.parent and self.parent.name)
+
+    def parse_config(self, path):
+
+        # temporary implementation
+
+        location =path
+        config = configparser.ConfigParser()
+        config.read(location)
+        self.config = config['Wool']
+
+    def generate_output(self, wrapped_module):
+
+        package = import_module(self.package)
+        try:
+            func = package.generate_output
+        except AttributeError:
+            raise NotImplementedError
+
+        func(wrapped_module)
 
 
 class WoolsRegistry:
