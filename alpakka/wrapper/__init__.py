@@ -3,6 +3,8 @@ __all__ = ['NodeWrapper', 'wrap_module']
 import alpakka
 
 from .nodewrapper import NodeWrapper
+from .grouponder import Grouponder
+from .typonder import Typonder
 
 
 def wrap_module(statement, wool=None):

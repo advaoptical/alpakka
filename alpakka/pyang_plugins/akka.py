@@ -167,9 +167,18 @@ class AkkaPlugin(plugin.PyangPlugin):
                 render_template=self.render_template,
             ))
         else:
-            for module in wrapped_modules.values():
-                module.generate_classes()
-            #self.wool.generate_commons(wrapped_modules)
+            try:
+                for module in wrapped_modules.values():
+                    module.generate_classes()
+            except AttributeError:
+                logging.error("The method generate_classes is not implemented")
+                logging.info("Entering interactive mode")
+                start_ipython([], user_ns=dict(
+                    ((module.statement.arg.replace('-', '_'), module)
+                     for module in wrapped_modules.values()),
+                    alpakka=alpakka,
+                    render_template=self.render_template,
+                ))
 
     def get_options(self, ctx):
         """
