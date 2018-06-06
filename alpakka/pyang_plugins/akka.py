@@ -153,7 +153,7 @@ class AkkaPlugin(plugin.PyangPlugin):
         # set output path
         if ctx.opts.akka_output:
             self.wool.output_path = ctx.opts.akka_output
-        self.wool.parse_config(ctx.opts.config_file)
+        self.wool.parse_config(self.wool, ctx.opts.config_file)
 
     def render_template(self, template_name, context):
         template = self.env.get_template(template_name)

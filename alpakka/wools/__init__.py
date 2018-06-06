@@ -3,8 +3,6 @@ from pprint import pformat
 from importlib import import_module
 from argparse import ArgumentParser
 
-import configparser
-
 from pkg_resources import iter_entry_points
 
 from alpakka.logger import LOGGER
@@ -158,14 +156,17 @@ class Wool(object):
             type(self).__qualname__, self.name, self.package,
             self.parent and self.parent.name)
 
-    def parse_config(self, path):
+    def parse_config(self, module, path):
 
         # temporary implementation
 
-        location =path
-        config = configparser.ConfigParser()
-        config.read(location)
-        self.config = config['Wool']
+        package = import_module(self.package)
+        try:
+            func = package.parse_config
+        except AttributeError:
+            raise NotImplementedError
+
+        func(module, path)
 
     def generate_output(self, wrapped_module):
 
