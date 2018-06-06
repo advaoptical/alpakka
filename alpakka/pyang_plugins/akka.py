@@ -130,14 +130,8 @@ class AkkaPlugin(plugin.PyangPlugin):
             wrapped_modules[wrapped_module.yang_module()] = wrapped_module
 
         # delete class duplications
-        # for module in wrapped_modules.values():
-        #     for name, child in set(module.classes.items()):
-        #         if child.statement.i_orig_module.arg != module.yang_module():
-        #             if name in wrapped_modules[child.statement.i_orig_module.arg].classes:
-        #                 module.classes.pop(name)
-        #             else:
-        #                 wrapped_modules[child.statement.i_orig_module.arg].classes[name] = child
-        #                 module.classes.pop(name)
+        for module in wrapped_modules.values():
+            self.wool.clear_data_structure(wrapped_modules, module)
 
         if ctx.opts.interactive:
             start_ipython([], user_ns=dict(

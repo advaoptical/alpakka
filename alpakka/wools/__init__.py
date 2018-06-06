@@ -177,6 +177,16 @@ class Wool(object):
 
         func(wrapped_module)
 
+    def clear_data_structure(self, wrapped_modules, module):
+
+        package = import_module(self.package)
+        try:
+            func = package.clear_data_structure
+        except AttributeError:
+            raise NotImplementedError
+
+        func(wrapped_modules, module)
+
 
 class WoolsRegistry:
     """
