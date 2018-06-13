@@ -22,6 +22,8 @@ class Grouponder(NodeWrapper):
                          statement as list
         :param uses: if the current statement has a uses substmt a Grouping
                      object created and stored in the uses var
+        :param is_augmented: identifier to indicate is the current statement
+                             augmented by an other module or not
         """
         super().__init__(statement, parent)
         self.uses = OrderedDict()

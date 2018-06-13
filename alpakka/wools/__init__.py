@@ -157,9 +157,13 @@ class Wool(object):
             self.parent and self.parent.name)
 
     def parse_config(self, module, path):
-
-        # temporary implementation
-
+        """
+        Method interface for the wool implementation to handle the wool
+        specific configuration and options
+        :param module: module for which the options should be set
+        :param path: location of the configuration file
+        :return:
+        """
         package = import_module(self.package)
         try:
             func = package.parse_config
@@ -169,7 +173,13 @@ class Wool(object):
         func(module, path)
 
     def generate_output(self, wrapped_module):
-
+        """
+        Method interface for the wool implementation of the output generation
+        is implemented as part of the dedicated wool implementation
+        :param wrapped_module: wrapped module statement for which the output
+               should be generated
+        :return:
+        """
         package = import_module(self.package)
         try:
             func = package.generate_output
@@ -178,11 +188,17 @@ class Wool(object):
 
         func(wrapped_module)
 
-    def clear_data_structure(self, wrapped_modules, module):
-
+    def data_cleansing(self, wrapped_modules, module):
+        """
+        Method Interface for the duplication detection and the data cleansing
+        which can be used and implemented by each wool
+        :param wrapped_modules: list of all module statement which are processed
+        :param module: the module for which the cleansing should be performed
+        :return:
+        """
         package = import_module(self.package)
         try:
-            func = package.clear_data_structure
+            func = package.data_cleansing
         except AttributeError:
             raise NotImplementedError
 

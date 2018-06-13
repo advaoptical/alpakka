@@ -1,6 +1,6 @@
 # Alpakka
 
-Is a python project to generate automated java code skeletons out of YANG statements. Primary purpose is to generate java code for network equipment which could be configured by Netconf/YANG, the code skeletons are prepaired in a way to handle Netconf/YANG requests.
+Is a python project to generate automated code skeletons out of YANG statements. Primary purpose is to generate code skeletons for network equipment which could be configured by Netconf/YANG, the code skeletons are prepaired in a way to handle Netconf/YANG requests.
 
 ## Getting Started
 

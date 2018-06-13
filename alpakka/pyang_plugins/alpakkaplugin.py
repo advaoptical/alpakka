@@ -1,8 +1,5 @@
 import logging
 import optparse
-import os
-
-from jinja2 import Environment, PackageLoader
 from pyang import plugin
 
 from IPython import start_ipython
@@ -16,65 +13,17 @@ default_values = {
     'int': 0,
     'boolean': 'false'
 }
-
-
-def firstupper(value):
-    """
-    Makes the first letter of the value upper case without touching
-    the rest of the string.
-    In case the value starts with an '_' it is removed and the following letter
-    is made upper case.
-
-    :param value: the string to be processed
-    :return: the value with a upper case first letter
-
-    >>> firstupper('helloworld')
-    'Helloworld'
-    >>> firstupper('_HelloWorld')
-    'HelloWorld'
-    """
-    value = value.lstrip('_')
-    return value and value[0].upper() + value[1:]
-
-
-def firstlower(value):
-    """
-    Makes the first letter of the value lower case without touching
-    the rest of the string.
-
-    :param value: the string to be processed
-    :return: the value with a lower case first letter
-
-    >>> firstlower('HelloWorld')
-    'helloWorld'
-    """
-    return value and value[0].lower() + value[1:]
-
-
-def java_default(value):
-    """
-    Maps the java type to the corresponding default value.
-
-    :param value: the java type string
-    :return: the default value
-
-    >>> java_default('int')
-    0
-    >>> java_default('boolean')
-    'false'
-    >>> java_default('Object')
-    'null'
-    """
-    return default_values.get(value, 'null')
-
-
 def pyang_plugin_init():
-    plugin.register_plugin(AkkaPlugin())
-
-
-class AkkaPlugin(plugin.PyangPlugin):
     """
-    Plugin to convert a yang model to akka code stubs.
+    Called by pyang plugin framework at to initialize the plugin.
+    :return:
+    """
+    plugin.register_plugin(AlpakkaPlugin())
+
+
+class AlpakkaPlugin(plugin.PyangPlugin):
+    """
+    Plugin to convert a yang model to code stubs.
     """
 
     def __init__(self):
@@ -82,7 +31,7 @@ class AkkaPlugin(plugin.PyangPlugin):
 
     def add_output_format(self, fmts):
         self.multiple_modules = True
-        fmts['akka'] = self
+        fmts['alpakkaplugin'] = self
 
     def add_opts(self, optparser):
         """
@@ -113,6 +62,14 @@ class AkkaPlugin(plugin.PyangPlugin):
         group.add_options(options)
 
     def emit(self, ctx, modules, writef):
+        """
+        Method which is called by pyang after the parsing and validation is
+        finished, this method initiates the output conversion
+        :param ctx:
+        :param modules: Array of statement objects representing all modules
+        :param writef:
+        :return:
+        """
         self.get_options(ctx)
         unique_modules = set()
         # collect set of unique modules, avoid wrapping the same one
@@ -129,9 +86,14 @@ class AkkaPlugin(plugin.PyangPlugin):
             wrapped_module = wrap_module(module, wool=self.wool)
             wrapped_modules[wrapped_module.yang_module()] = wrapped_module
 
-        # delete class duplications
+        # due to the wrapping process statements which are used multiple times
+        # in different modules might be wrapped multiple times. To avoid
+        # multiple output generations the data structure is traversed and all
+        # duplicates, in modules which are not the module which was originally
+        # implementing the statement, are deleted.
+        # Is implemented inside the used wool and can be wool specific
         for module in wrapped_modules.values():
-            self.wool.clear_data_structure(wrapped_modules, module)
+            self.wool.data_cleansing(wrapped_modules, module)
 
         if ctx.opts.interactive:
             start_ipython([], user_ns=dict(
@@ -141,6 +103,8 @@ class AkkaPlugin(plugin.PyangPlugin):
                 render_template=self.render_template,
             ))
         else:
+            # output generation is performed per parsed module and is
+            # implemented inside the used wool. Can be wool specific
             for wrapped_module in wrapped_modules.values():
                 self.wool.generate_output(wrapped_module)
 
@@ -149,12 +113,23 @@ class AkkaPlugin(plugin.PyangPlugin):
         Extract option parameters from the context.
         :param ctx: the context
         """
+        # parsing of options which are general for the alpakkaplugin and not
+        # wool specific
         self.wool = ctx.opts.wool and WOOLS[ctx.opts.wool] or WOOLS.default
         # set output path
         if ctx.opts.akka_output:
             self.wool.output_path = ctx.opts.akka_output
+        # pasing from the wool specific options and configuration parameters
+        # is implemented inside the specific wool and can be wool specific
         self.wool.parse_config(self.wool, ctx.opts.config_file)
 
     def render_template(self, template_name, context):
+        """
+        Methode which is only needed as part of the interactive mode of the
+        alpakka plugin
+        :param template_name:
+        :param context:
+        :return:
+        """
         template = self.env.get_template(template_name)
         return template.render(context)

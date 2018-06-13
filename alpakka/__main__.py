@@ -21,5 +21,5 @@ ALPAKKA_PLUGIN_DIR = Path(alpakka.pyang_plugins.__file__).realpath().dirname()
 PYANG_SCRIPT = Path(sysconfig.get_path('scripts')) / 'pyang'
 
 
-sys.argv += ['--plugindir', ALPAKKA_PLUGIN_DIR, '-f', 'akka']
+sys.argv += ['--plugindir', ALPAKKA_PLUGIN_DIR, '-f', 'alpakkaplugin']
 exec(compile(PYANG_SCRIPT.text(), PYANG_SCRIPT, 'exec'))
