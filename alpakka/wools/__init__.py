@@ -188,7 +188,7 @@ class Wool(object):
 
         func(wrapped_module)
 
-    def data_cleansing(self, wrapped_modules, module):
+    def wrapping_postprocessing(self, wrapped_modules, module):
         """
         Method Interface for the duplication detection and the data cleansing
         which can be used and implemented by each wool
@@ -198,7 +198,7 @@ class Wool(object):
         """
         package = import_module(self.package)
         try:
-            func = package.data_cleansing
+            func = package.wrapping_postprocessing
         except AttributeError:
             raise NotImplementedError
 
