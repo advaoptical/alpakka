@@ -1,4 +1,4 @@
-__all__ = ['NodeWrapper', 'wrap_module']
+__all__ = ('NodeWrapper', 'wrap_module', 'Grouponder', 'Typonder')
 
 import alpakka
 

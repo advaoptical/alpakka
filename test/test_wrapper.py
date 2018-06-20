@@ -39,17 +39,17 @@ class TestModule:
                        'intents']) == sorted(
                [i.rsplit('/', 1)[1] for i in
                 wrapped_module.all_nodes['list'].keys()])
-        assert sorted(['endpoint-identifier', 'intent-identifier',
-                       'topology-identifier', 'bit-rate', 'disjoint']) ==\
-               sorted([i.rsplit('/', 1)[1] for i in
-                       wrapped_module.all_nodes['typedef'].keys()])
-        assert sorted(['endpoint-id', 'protection', 'minimum-paths',
-                       'flexible-bandwidth', 'dedicated-bandwidth',
-                       'intent-id', 'disjoint-paths', 'satisfied',
-                       'maximum-active-connections',
-                       'topology-id']) == sorted(
-               [i.rsplit('/', 1)[1] for i in
-                wrapped_module.all_nodes['leaf'].keys()])
+        assert (sorted(['endpoint-identifier', 'intent-identifier',
+                        'topology-identifier', 'bit-rate', 'disjoint']) ==
+                sorted([i.rsplit('/', 1)[1] for i in
+                        wrapped_module.all_nodes['typedef'].keys()]))
+        assert (sorted(['endpoint-id', 'protection', 'minimum-paths',
+                        'flexible-bandwidth', 'dedicated-bandwidth',
+                        'intent-id', 'disjoint-paths', 'satisfied',
+                        'maximum-active-connections',
+                        'topology-id']) ==
+                sorted([i.rsplit('/', 1)[1] for i in
+                        wrapped_module.all_nodes['leaf'].keys()]))
 
     def test_yang_type(self, yang_module):
         wrapped_module = wrap_module(yang_module)
@@ -65,7 +65,7 @@ class TestModule:
 
     def test_parent(self, yang_module):
         wrapped_module = wrap_module(yang_module)
-        assert None == wrapped_module.parent
+        assert None is wrapped_module.parent
 
     def test_description(self, yang_module):
         wrapped_module = wrap_module(yang_module)
@@ -123,4 +123,4 @@ class TestContainer:
         wrapped_module = wrap_module(yang_module)
         wrapped_container = wrapped_module.topologies
 
-        assert True == wrapped_container.config
+        assert True is wrapped_container.config
