@@ -16,4 +16,4 @@ def wrap_module(statement, wool=None):
     """
     if wool is None:
         wool = alpakka.WOOLS.default
-    return wool['module'](statement)
+    return wool.get('module')(statement)
