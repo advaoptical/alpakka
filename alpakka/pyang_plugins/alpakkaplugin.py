@@ -93,7 +93,7 @@ class AlpakkaPlugin(plugin.PyangPlugin):
         # implementing the statement, are deleted.
         # Is implemented inside the used wool and can be wool specific
         for module in wrapped_modules.values():
-            self.wool.wrapping_postprocessing(wrapped_modules, module)
+            self.wool.wrapping_postprocessing(module, wrapped_modules)
 
         if ctx.opts.interactive:
             start_ipython([], user_ns=dict(

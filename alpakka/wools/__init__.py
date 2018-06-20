@@ -172,7 +172,7 @@ class Wool(object):
 
         func(module, path)
 
-    def generate_output(self, wrapped_module):
+    def generate_output(self, module):
         """
         Method interface for the wool implementation of the output generation
         is implemented as part of the dedicated wool implementation
@@ -186,9 +186,9 @@ class Wool(object):
         except AttributeError:
             raise NotImplementedError
 
-        func(wrapped_module)
+        func(module)
 
-    def wrapping_postprocessing(self, wrapped_modules, module):
+    def wrapping_postprocessing(self, module, wrapped_modules):
         """
         Method Interface for the duplication detection and the data cleansing
         which can be used and implemented by each wool
@@ -202,7 +202,7 @@ class Wool(object):
         except AttributeError:
             raise NotImplementedError
 
-        func(wrapped_modules, module)
+        func(module, wrapped_modules)
 
 
 class WoolsRegistry:
