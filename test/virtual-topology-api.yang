@@ -1,0 +1,144 @@
+module virtual-topology-api {
+    yang-version 1;
+    namespace "http://www.advaoptical.com/virtop";
+    prefix "virtop";
+
+    organization "ADVA Optical Networking";
+    contact "Thomas Szyrkowiec (tszyrkowiec@advaoptical.com)";
+
+    description "Definition of an intent interface for requesting virtual topologies.";
+
+    revision 2017-02-16 {
+        description "Initial revision.";
+    }
+
+    /*******************
+    * Type Definitions *
+    *******************/
+
+    typedef endpoint-identifier {
+        type string;
+        description "Unique identifier for an endpoint, e.g. node, module, port, interface.";
+    }
+
+    typedef intent-identifier {
+        type string;
+        description "Unique identifier for an intent group.";
+    }
+
+    typedef topology-identifier {
+        type string;
+        description "Unique identifier for a (virtual) topology.";
+    }
+
+    typedef bit-rate {
+        type uint64;
+        units "Mbit/s";
+        description "Data rate in Mbit/s.";
+    }
+
+    typedef disjoint {
+        type enumeration {
+            enum no;
+            enum link;
+            enum node;
+            /* Does this make sense? */
+            enum partially;
+        }
+        description "Types of disjoint paths.";
+    }
+
+    /************
+    * Groupings *
+    ************/
+
+    grouping intent-group {
+        leaf intent-id {
+            type intent-identifier;
+            description "Unique intent ID.";
+        }
+        leaf-list endpoints {
+            type endpoint-identifier;
+            min-elements 2;
+            description "The intents are applied to this set of endpoints.";
+        }
+        leaf dedicated-bandwidth {
+            type bit-rate;
+            description "Reserved (always available) bandwidth between endpoints.";
+        }
+        leaf flexible-bandwidth {
+            type bit-rate;
+            description "Shared (best-effort) bandwidth between endpoints.";
+        }
+        leaf minimum-paths {
+            type uint8;
+            default 1;
+            description "The minimum number of parallel paths.";
+        }
+        leaf disjoint-paths {
+            type disjoint;
+            default no;
+            description "The type of disjointness for parallel paths.";
+        }
+        leaf protection {
+            type boolean;
+			mandatory true;
+            default "false";
+            description "True if optical protection is required.";
+        }
+        leaf maximum-active-connections {
+            type uint8;
+            description "The maximum number of installed lightpaths at the same time.";
+        }
+        leaf satisfied {
+            config false;
+            type boolean;
+            description "Indicates if the intent is satisfied.";
+        }
+        description "An intent group describes the requirements for the connectivity
+                between a set of endpoints.";
+        /* Maybe a flag indicating if all intents have to be satisfied. Probably a lot of work to implement. */
+    }
+
+    /*************
+    * Containers *
+    *************/
+
+    container topologies {
+        config true;
+        list installed-topologies {
+            key topology-id;
+            leaf topology-id {
+                type topology-identifier;
+                description "Unique topology ID.";
+            }
+            list intents {
+                key intent-id;
+                uses intent-group;
+                description "A list of intent groups that need to be satisfied by the topology.";
+            }
+            description "A topology consists of an identifier and the intents that need
+                        to be satisfied by it.";
+        }
+        description "Starting point for the virtual topologies.";
+    }
+
+    container endpoints {
+        config false;
+        list assigned-endpoints {
+            key endpoint-id;
+            leaf endpoint-id {
+                type endpoint-identifier;
+            }
+			list intents {
+                key intent-id;
+                uses intent-group;
+                description "A list of intent groups that need to be satisfied by the topology.";
+            }
+            description "List of all assigned endpoints that can be used for requesting
+                        virtual topologies.";
+            /* TODO: additional fields like location, properties and status. */
+        }
+        description "Starting point for the state data about assigned endpoints.";
+    }
+}

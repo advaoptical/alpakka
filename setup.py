@@ -5,7 +5,7 @@ setup(
     version='0.1.dev',
     description="Cutest YANG Eater alive",
 
-    install_requires=['pyang', 'jinja2', 'path.py', 'pluggy>=0.4'],
+    install_requires=['pyang', 'jinja2', 'path.py', 'ipython'],
 
     packages=[
         'alpakka',
