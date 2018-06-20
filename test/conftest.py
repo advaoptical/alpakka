@@ -3,9 +3,9 @@ import pyang
 from path import Path
 
 """
-    Pytest fixture statement, works like a global Variable for the test Session.
-    Provides a fixed baseline upon which tests can reliably and repeatedly be
-    executed.
+    Pytest fixture statement, works like a global Variable for the test
+    Session. Provides a fixed baseline upon which tests can reliably and
+    repeatedly be executed.
     In this file should only statements be defined which are used in multiple
     tests and for the testing of different modules.
 """

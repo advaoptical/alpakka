@@ -1,4 +1,3 @@
-from alpakka import WOOLS
 from alpakka.wrapper import wrap_module
 from alpakka.wrapper.nodewrapper import Module
 from collections import OrderedDict
@@ -75,8 +74,8 @@ class TestModule:
 
     def test_children(self, yang_module):
         wrapped_module = wrap_module(yang_module)
-        assert set([i.arg for i in yang_module.i_children]) ==\
-               set(wrapped_module.children.keys())
+        assert set([i.arg for i in yang_module.i_children]) == set(
+            wrapped_module.children.keys())
 
     def test_derived_types(self, yang_module):
         wrapped_module = wrap_module(yang_module)
@@ -117,8 +116,8 @@ class TestContainer:
         wrapped_module = wrap_module(yang_module)
         wrapped_container = wrapped_module.topologies
 
-        assert sorted(['installed-topologies']) ==\
-               sorted(wrapped_container.children)
+        assert sorted(['installed-topologies']) == sorted(wrapped_container.
+                                                          children)
 
     def test_config(self, yang_module):
         wrapped_module = wrap_module(yang_module)
