@@ -10,6 +10,7 @@ from path import Path
     tests and for the testing of different modules.
 """
 
+
 @pytest.fixture(scope='session')
 def yang_module_name():
     """
@@ -24,7 +25,8 @@ def yang_module_name():
 @pytest.fixture(scope='session')
 def pyang_plugin_name():
     """
-    Fixture statement which returns the name of the pyang plugin which will be used
+    Fixture statement which returns the name of the pyang plugin which will
+    be used
     during the test session
 
     :return: name of the pyang plugin
@@ -56,8 +58,8 @@ def yang_module(yang_module_name, yang_context):
 @pytest.fixture(scope='session')
 def yang_context():
     """
-    Fixture statement to generate the pyang context for test purposes. A context
-    is a module which encapsulates the parsing session.
+    Fixture statement to generate the pyang context for test purposes. A
+    context is a module which encapsulates the parsing session.
 
     :return: pyang context object
     """
@@ -79,4 +81,3 @@ def yang_query():
             yield from query(stmt, yang_type)
 
     return query
-

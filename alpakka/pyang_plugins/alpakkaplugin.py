@@ -13,6 +13,8 @@ default_values = {
     'int': 0,
     'boolean': 'false'
 }
+
+
 def pyang_plugin_init():
     """
     Called by pyang plugin framework at to initialize the plugin.

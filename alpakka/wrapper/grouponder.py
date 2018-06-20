@@ -121,8 +121,8 @@ class Grouponder(NodeWrapper):
     @template_var
     def all_children(self):
         """
-        Collects a list of all child stmts of the current stmt regardless of the
-        kind of implementation (local or import).
+        Collects a list of all child stmts of the current stmt regardless of
+        the kind of implementation (local or import).
         :return: list of stmts
         """
         result = OrderedDict(self.children)

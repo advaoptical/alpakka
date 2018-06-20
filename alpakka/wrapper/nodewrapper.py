@@ -1,5 +1,4 @@
 import logging
-import re
 import sys
 from collections import OrderedDict
 
@@ -174,8 +173,8 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
         :return: a unique key which is a human readable path to the module
         """
         key = ''
-        # Key generation for elements which could be imported from other Modules
-        # or be implemented locally
+        # Key generation for elements which could be imported from other
+        # Modules or be implemented locally
         if self.yang_type() == 'grouping' or self.yang_type() == 'typedef':
             return self.statement.parent.arg + "/" + self.statement.arg
         # Key generation for all other Statements

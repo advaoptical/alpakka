@@ -1,13 +1,10 @@
-from path import Path
 from pprint import pformat
 from importlib import import_module
-from argparse import ArgumentParser
 
 from pkg_resources import iter_entry_points
 
 from alpakka.logger import LOGGER
 
-from jinja2 import Environment, PackageLoader
 
 __all__ = ['Wool', 'register']
 
@@ -192,7 +189,8 @@ class Wool(object):
         """
         Method Interface for the duplication detection and the data cleansing
         which can be used and implemented by each wool
-        :param wrapped_modules: list of all module statement which are processed
+        :param wrapped_modules: list of all module statement which are
+            processed
         :param module: the module for which the cleansing should be performed
         :return:
         """

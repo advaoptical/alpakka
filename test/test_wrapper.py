@@ -8,7 +8,8 @@ def test_wrap_module(yang_module):
     """
     Test function to test the correct wrapping of a module statement
 
-    :param yang_module:         python representation of a yang module generated with pyang (see conftest.py)
+    :param yang_module:         python representation of a yang module
+                                generated with pyang (see conftest.py)
     :return:                    no return value implemented
     """
     wrapped_module = wrap_module(yang_module)
@@ -40,13 +41,14 @@ class TestModule:
                [i.rsplit('/', 1)[1] for i in
                 wrapped_module.all_nodes['list'].keys()])
         assert sorted(['endpoint-identifier', 'intent-identifier',
-                       'topology-identifier', 'bit-rate', 'disjoint']) == sorted(
-            [i.rsplit('/', 1)[1] for i in
-             wrapped_module.all_nodes['typedef'].keys()])
+                       'topology-identifier', 'bit-rate', 'disjoint']) ==\
+               sorted([i.rsplit('/', 1)[1] for i in
+                       wrapped_module.all_nodes['typedef'].keys()])
         assert sorted(['endpoint-id', 'protection', 'minimum-paths',
-                'flexible-bandwidth', 'dedicated-bandwidth', 'intent-id',
-                'disjoint-paths', 'satisfied', 'maximum-active-connections',
-                'topology-id']) == sorted(
+                       'flexible-bandwidth', 'dedicated-bandwidth',
+                       'intent-id', 'disjoint-paths', 'satisfied',
+                       'maximum-active-connections',
+                       'topology-id']) == sorted(
                [i.rsplit('/', 1)[1] for i in
                 wrapped_module.all_nodes['leaf'].keys()])
 
@@ -73,7 +75,7 @@ class TestModule:
 
     def test_children(self, yang_module):
         wrapped_module = wrap_module(yang_module)
-        assert set([i.arg for i in yang_module.i_children]) == \
+        assert set([i.arg for i in yang_module.i_children]) ==\
                set(wrapped_module.children.keys())
 
     def test_derived_types(self, yang_module):
@@ -87,7 +89,7 @@ class TestModule:
             wrapped_module.uses
 
     def test_all_children(self, yang_module):
-        wrapped_module =wrap_module(yang_module)
+        wrapped_module = wrap_module(yang_module)
         assert wrapped_module.children == wrapped_module.all_children()
 
     def test_top(self, yang_module):
@@ -99,9 +101,11 @@ class TestContainer:
 
     def test_parent(self, yang_module):
         """
-        Test function to test the correct wrapping of all container statements attached to the yang module under test
+        Test function to test the correct wrapping of all container statements
+        attached to the yang module under test
 
-        :param yang_module:         python representation of a yang module generated with pyang (see conftest.py)
+        :param yang_module:         python representation of a yang module
+                                    generated with pyang (see conftest.py)
         :return:
         """
         wrapped_module = wrap_module(yang_module)
@@ -113,7 +117,7 @@ class TestContainer:
         wrapped_module = wrap_module(yang_module)
         wrapped_container = wrapped_module.topologies
 
-        assert sorted(['installed-topologies']) == \
+        assert sorted(['installed-topologies']) ==\
                sorted(wrapped_container.children)
 
     def test_config(self, yang_module):
