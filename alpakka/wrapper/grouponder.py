@@ -39,7 +39,7 @@ class Grouponder(NodeWrapper):
             if child_wrapper:
                 self.children[child.arg] = child_wrapper(child, parent=self)
             else:
-                logging.debug("No wrapper for yang type: %s (%s)" %
+                logging.info("No wrapper for yang type: %s (%s)" %
                               (child.keyword, child.arg))
 
         # find all stmts which are imported with a 'uses' substmt and wrap the

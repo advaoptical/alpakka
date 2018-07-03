@@ -159,7 +159,7 @@ class Wool(object):
         specific configuration and options
         :param module: module for which the options should be set
         :param path: location of the configuration file
-        :return:
+
         """
         package = import_module(self.package)
         try:
@@ -175,7 +175,7 @@ class Wool(object):
         is implemented as part of the dedicated wool implementation
         :param wrapped_module: wrapped module statement for which the output
                should be generated
-        :return:
+
         """
         package = import_module(self.package)
         try:
@@ -192,7 +192,7 @@ class Wool(object):
         :param wrapped_modules: list of all module statement which are
             processed
         :param module: the module for which the cleansing should be performed
-        :return:
+
         """
         package = import_module(self.package)
         try:

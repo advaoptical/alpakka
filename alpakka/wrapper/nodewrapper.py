@@ -11,28 +11,6 @@ WOOLS = alpakka.WOOLS
 # configuration for logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
-TYPE_PATTERNS = OrderedDict([
-    ('binary', 'binary'),
-    ('bits', 'bits'),
-    ('boolean', 'boolean'),
-    ('decimal64', 'decimal64'),
-    ('empty', 'empty'),
-    ('enumeration', 'enumeration'),
-    ('identityref', 'identityref'),
-    ('instance-identifier', 'instance-identifier'),
-    ('int8', 'int8'),
-    ('int16', 'int16'),
-    ('int32', 'int32'),
-    ('int64', 'int64'),
-    ('leafref', 'leafref'),
-    ('string', 'string'),
-    ('uint8', 'uint8'),
-    ('uint16', 'uint16'),
-    ('uint32', 'uint32'),
-    ('uint64', 'uint64'),
-    ('union', 'union')
-])
-
 
 class NodeWrapperMeta(type):
     """

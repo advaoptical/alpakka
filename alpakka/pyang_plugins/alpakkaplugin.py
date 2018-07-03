@@ -46,7 +46,7 @@ class AlpakkaPlugin(plugin.PyangPlugin):
                 help="The Wool to use for knitting the code"
             ),
             optparse.make_option(
-                "--output-path", dest="akka_output", action="store",
+                "--output-path", dest="output", action="store",
                 help="output path for the generated classes"
             ),
             optparse.make_option(
@@ -70,7 +70,6 @@ class AlpakkaPlugin(plugin.PyangPlugin):
         :param ctx:
         :param modules: Array of statement objects representing all modules
         :param writef:
-        :return:
         """
         self.get_options(ctx)
         unique_modules = set()
@@ -117,10 +116,9 @@ class AlpakkaPlugin(plugin.PyangPlugin):
         """
         # parsing of options which are general for the alpakkaplugin and not
         # wool specific
-        self.wool = ctx.opts.wool and WOOLS[ctx.opts.wool] or WOOLS.default
+        self.wool = WOOLS[ctx.opts.wool] or WOOLS.default
         # set output path
-        if ctx.opts.akka_output:
-            self.wool.output_path = ctx.opts.akka_output
+        self.wool.output_path = ctx.opts.output or ""
         # pasing from the wool specific options and configuration parameters
         # is implemented inside the specific wool and can be wool specific
         self.wool.parse_config(self.wool, ctx.opts.config_file)
