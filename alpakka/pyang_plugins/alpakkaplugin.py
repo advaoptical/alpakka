@@ -33,7 +33,7 @@ class AlpakkaPlugin(plugin.PyangPlugin):
 
     def add_output_format(self, fmts):
         self.multiple_modules = True
-        fmts['alpakkaplugin'] = self
+        fmts['alpakka'] = self
 
     def add_opts(self, optparser):
         """
