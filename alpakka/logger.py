@@ -1,11 +1,9 @@
 import logging
-import sys
 
+formatter = logging.Formatter("alpakka [%(module)s, %(levelname)s]: %(message)s")
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
 
 LOGGER = logging.getLogger('alpakka')
-
-HANDLER = logging.StreamHandler(sys.stderr)
-LOGGER.addHandler(HANDLER)
-
-HANDLER.formatter = FORMATTER = logging.Formatter(
-    "alpakka[%(levelname)s]: %(message)s")
+LOGGER.setLevel(logging.INFO)
+LOGGER.addHandler(handler)

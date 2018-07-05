@@ -2,7 +2,7 @@ from alpakka.wrapper.nodewrapper import NodeWrapper
 from alpakka.wrapper.nodewrapper import Listonder
 from alpakka.templates import template_var
 from collections import OrderedDict
-import logging
+from alpakka.logger import LOGGER
 import alpakka
 
 WOOLS = alpakka.WOOLS
@@ -39,8 +39,8 @@ class Grouponder(NodeWrapper):
             if child_wrapper:
                 self.children[child.arg] = child_wrapper(child, parent=self)
             else:
-                logging.info("No wrapper for yang type: %s (%s)" %
-                              (child.keyword, child.arg))
+                LOGGER.info("No wrapper for yang type: %s (%s)" %
+                            (child.keyword, child.arg))
 
         # find all stmts which are imported with a 'uses' substmt and wrap the
         # Grouping object related to ths uses
@@ -73,7 +73,7 @@ class Grouponder(NodeWrapper):
                     for grp in set(augment_stmt.search('uses')):
                         key = grp.parent.arg[1:] + '/' + \
                               grp.arg
-                        group = self.top().all_nodes.get('grouping', {}).\
+                        group = self.top().all_nodes.get('grouping', {}). \
                             get(key)
                         if group:
                             self.uses[group.yang_name()] = group

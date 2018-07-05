@@ -1,25 +1,15 @@
-__all__ = ['WOOLS', 'LOGGER', 'NodeWrapper', 'Wool', 'register_wool', 'run']
+__all__ = ['WOOLS', 'LOGGER', 'NodeWrapper', 'Wool', 'run']
 
-import alpakka.wools
 from alpakka.logger import LOGGER
+import alpakka.wools
 from alpakka.wools import WoolsRegistry, Wool
-
 
 #: The central Wool registry. ``WOOLS.default`` is the basic Wool. All Wool
 #  plugins go into ``WOOLS[<plugin name>]``
 WOOLS = WoolsRegistry()
 
-
 # implicitly loads default Wool
 from alpakka.wrapper import NodeWrapper  # Ignore PycodestyleBear (E402)
-
-
-def register_wool(name, package, parent=None, data_type_patterns=None,
-                  options=None):
-    return alpakka.wools.register(WOOLS, name, package, parent=parent,
-                                  data_type_patterns=data_type_patterns,
-                                  options=options)
-
 
 # auto-load all Wools which are defined as 'alpakka_wools' entry points in
 # their distribution's setuptools.setup()

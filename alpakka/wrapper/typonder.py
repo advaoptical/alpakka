@@ -3,31 +3,6 @@ from alpakka.wrapper.nodewrapper import Listonder
 from alpakka.templates import template_var
 from collections import OrderedDict
 import re
-import alpakka
-
-WOOLS = alpakka.WOOLS
-
-TYPE_PATTERNS = OrderedDict([
-    ('binary', 'binary'),
-    ('bits', 'bits'),
-    ('boolean', 'boolean'),
-    ('decimal64', 'decimal64'),
-    ('empty', 'empty'),
-    ('enumeration', 'enumeration'),
-    ('identityref', 'identityref'),
-    ('instance-identifier', 'instance-identifier'),
-    ('int8', 'int8'),
-    ('int16', 'int16'),
-    ('int32', 'int32'),
-    ('int64', 'int64'),
-    ('leafref', 'leafref'),
-    ('string', 'string'),
-    ('uint8', 'uint8'),
-    ('uint16', 'uint16'),
-    ('uint32', 'uint32'),
-    ('uint64', 'uint64'),
-    ('union', 'union')
-])
 
 
 class Typonder(NodeWrapper):
@@ -54,19 +29,10 @@ class Typonder(NodeWrapper):
         super().__init__(statement, parent)
         type_stmt = statement.search_one('type')
         if type_stmt:
+            data_types = self.WOOL.data_type_mappings
             # processing if the yang type is a base type
-            if type_stmt.arg in TYPE_PATTERNS:
-                # check whether the data_type is defined by the wool as
-                # language specific type
-                data_type_paterns = self.WOOL._data_type_patterns.items()
-                for pattern, wool_type_name in data_type_paterns:
-                    if re.match(pattern, type_stmt.arg):
-                        self.data_type = wool_type_name
-                        break
-                else:
-                    # additional compliance test that the type is a correct
-                    # Yang type
-                    self.data_type = TYPE_PATTERNS[type_stmt.arg]
+            if type_stmt.arg in data_types:
+                self.data_type = data_types[type_stmt.arg]
                 self.is_build_in_type = True
             # processing if the yang type is typedef
             else:
@@ -163,16 +129,9 @@ class Union(Typonder, yang='union'):
         # list of types that belong to the union
         self.types = OrderedDict()
         for stmt in statement.search('type'):
-            if stmt.arg in TYPE_PATTERNS.keys():
-                for pattern, wool_type_name in self.WOOL._data_type_patterns.\
-                        items():
-                    if re.match(pattern, stmt.arg):
-                        self.types[wool_type_name] = wool_type_name
-                        break
-                else:
-                    # additional compliance test that the type is a correct
-                    # Yang type
-                    self.types[stmt.arg] = TYPE_PATTERNS[stmt.arg]
+            if stmt.arg in self.WOOL.data_type_mappings:
+                wool_data_type = self.WOOL.data_type_mappings[stmt.arg]
+                self.types[wool_data_type] = wool_data_type
             elif stmt.arg in self.top().derived_types.keys():
                 key = stmt.arg
                 self.types[stmt.arg] = self.top().derived_types.get(

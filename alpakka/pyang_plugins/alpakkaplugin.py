@@ -1,4 +1,4 @@
-import logging
+from alpakka.logger import LOGGER
 import optparse
 from pyang import plugin
 
@@ -7,7 +7,6 @@ from IPython import start_ipython
 import alpakka
 from alpakka import WOOLS
 from alpakka.wrapper import wrap_module
-
 
 default_values = {
     'int': 0,
@@ -81,8 +80,8 @@ class AlpakkaPlugin(plugin.PyangPlugin):
         # wrap unique modules
         wrapped_modules = dict()
         for module in unique_modules:
-            logging.info("Wrapping module %s (%s)",
-                         module.arg, module.i_latest_revision)
+            LOGGER.info("Wrapping module %s (%s)",
+                        module.arg, module.i_latest_revision)
             # wrap module statement
             wrapped_module = wrap_module(module, wool=self.wool)
             wrapped_modules[wrapped_module.yang_module()] = wrapped_module
@@ -101,7 +100,6 @@ class AlpakkaPlugin(plugin.PyangPlugin):
                 ((module.statement.arg.replace('-', '_'), module)
                  for module in wrapped_modules.values()),
                 alpakka=alpakka,
-                render_template=self.render_template,
             ))
         else:
             # output generation is performed per parsed module and is
@@ -121,15 +119,4 @@ class AlpakkaPlugin(plugin.PyangPlugin):
         self.wool.output_path = ctx.opts.output or ""
         # pasing from the wool specific options and configuration parameters
         # is implemented inside the specific wool and can be wool specific
-        self.wool.parse_config(self.wool, ctx.opts.config_file)
-
-    def render_template(self, template_name, context):
-        """
-        Methode which is only needed as part of the interactive mode of the
-        alpakka plugin
-        :param template_name:
-        :param context:
-        :return:
-        """
-        template = self.env.get_template(template_name)
-        return template.render(context)
+        self.wool.parse_config(ctx.opts.config_file)

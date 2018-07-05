@@ -1,12 +1,10 @@
-from pprint import pformat
-from importlib import import_module
-
 from pkg_resources import iter_entry_points
+from pprint import pformat
 
+from .default_wool import Wool
 from alpakka.logger import LOGGER
 
-
-__all__ = ['Wool', 'register']
+__all__ = ['Wool', 'WoolsRegistry']
 
 
 def load_from_entry_points():
@@ -28,181 +26,6 @@ def load_from_entry_points():
         woolpoint.load()
 
 
-def register(registry, name, package, parent=None, data_type_patterns=None,
-             options=None):
-    """
-    Creates a new :class:`alpakka.Wool` instance and adds it to the
-    given `registry`
-
-    :param registry: The :class:`alpakka.wools.WoolsRegistry` instance to use
-    :param name:     The Wool's name
-    :param package:  The Wool's fully-qualified python package name
-    :param parent:   The optional case-insentitive name of an already
-                     registered parent wool Which is further customized by
-                     this Wool
-    """
-    if parent:
-        parentwool = registry[parent.lower()]
-    else:
-        parentwool = registry.default
-
-    wool = Wool(name, package, parent=parentwool,
-                data_type_patterns=data_type_patterns, options=options)
-    registry.register(package, wool)
-
-    LOGGER.info("Registered {!r}".format(wool))
-    return wool
-
-
-class Wool(object):
-    """
-    The wool handler that stores the wool's name, its python package name,
-    and an optional parent :class:`Wool` instance
-
-    For case-insentitive lookups, a normalized identification name for the
-    wool is created by lowering the wool's name
-    """
-
-    def __init__(self, name, package, parent=None, data_type_patterns=None,
-                 options=None):
-        """
-        :param name:    The wool's name
-        :param package: The wool's fully-qualified python package name
-        :param parent:  The optional :class:`Wool` instance of a parent wool
-                        which is further customized by this wool
-        """
-        self.name = name
-        self.package = package
-        self.parent = parent
-        self.output_path = ''
-        self.config = {}
-        self._data_type_patterns = (parent and
-                                    dict(parent._data_type_patterns) or {})
-        if data_type_patterns is not None:
-            self._data_type_patterns.update(data_type_patterns)
-
-        self._yang_wrappers = parent and dict(parent._yang_wrappers) or {}
-
-    def id(self):
-        """
-        :return: the wool's identifier (lower case name)
-        """
-        return self.name.lower()
-
-    def _selfify(self, wrapcls):
-        """
-        Check if ``.WOOL`` reference of given
-        :class:`alpakka.NodeWrapper`-derived `wrapcls` is `self`, and if not,
-        override the ``.WOOL`` reference
-
-        :return: given `wrapcls` with correct ``.WOOL`` reference
-        """
-        if wrapcls.WOOL is not self:
-            wrapcls.WOOL = self
-        return wrapcls
-
-    def __getitem__(self, name):
-        """
-        Get the Wool's YANG node wrapper class for given YANG statement `name`
-
-        If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
-        """
-        return self._selfify(self._yang_wrappers[name])
-
-    def get(self, name):
-        """
-        Get the Wool's YANG node wrapper class for given YANG statement
-        `name`, returning ``None`` if it can't be found, instead of raising an
-        exception
-
-        If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
-        """
-        wrapcls = self._yang_wrappers.get(name)
-        if wrapcls is not None:
-            return self._selfify(wrapcls)
-
-    def __getattr__(self, name):
-        """
-        Get the Wool's YANG node wrapper class that has given class `name`,
-        instead of YANG statement name
-
-        If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
-        """
-        for wrapcls in self._yang_wrappers.values():
-            if wrapcls.__name__ == name:
-                return self._selfify(wrapcls)
-
-        raise AttributeError(name)
-
-    def __dir__(self):
-        """
-        Extend basic ``__dir__`` with all YANG node wrapper class names of
-        this Wool, for use with :meth:`.__getattr__`
-        """
-        return super().__dir__() + [wrapcls.__name__ for wrapcls in
-                                    self._yang_wrappers.values()]
-
-    def __repr__(self):
-        """
-        Create a representation in instantiation code style
-        """
-        return "{}({!r}, {!r}, parent={!r})".format(
-            type(self).__qualname__, self.name, self.package,
-            self.parent and self.parent.name)
-
-    def parse_config(self, module, path):
-        """
-        Method interface for the wool implementation to handle the wool
-        specific configuration and options
-        :param module: module for which the options should be set
-        :param path: location of the configuration file
-
-        """
-        package = import_module(self.package)
-        try:
-            func = package.parse_config
-        except AttributeError:
-            raise NotImplementedError
-
-        func(module, path)
-
-    def generate_output(self, module):
-        """
-        Method interface for the wool implementation of the output generation
-        is implemented as part of the dedicated wool implementation
-        :param wrapped_module: wrapped module statement for which the output
-               should be generated
-
-        """
-        package = import_module(self.package)
-        try:
-            func = package.generate_output
-        except AttributeError:
-            raise NotImplementedError
-
-        func(module)
-
-    def wrapping_postprocessing(self, module, wrapped_modules):
-        """
-        Method Interface for the duplication detection and the data cleansing
-        which can be used and implemented by each wool
-        :param wrapped_modules: list of all module statement which are
-            processed
-        :param module: the module for which the cleansing should be performed
-
-        """
-        package = import_module(self.package)
-        try:
-            func = package.wrapping_postprocessing
-        except AttributeError:
-            raise NotImplementedError
-
-        func(module, wrapped_modules)
-
-
 class WoolsRegistry:
     """
     The class of the :data:`alpakka.WOOLS` registry
@@ -218,13 +41,14 @@ class WoolsRegistry:
     def __init__(self):
         self.wools = dict()
 
-    def register(self, package, wool):
+    def register(self, wool):
         """
         Registers the wool together with its python package
-        :param package: the wool's python package
+
         :param wool: the wool
         """
-        self.wools[package] = wool
+        self.wools[wool.package] = wool
+        LOGGER.info("Registered {!r}".format(wool))
 
     def items(self):
         """

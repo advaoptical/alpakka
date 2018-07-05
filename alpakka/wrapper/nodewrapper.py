@@ -1,4 +1,3 @@
-import logging
 import sys
 from collections import OrderedDict
 
@@ -7,9 +6,6 @@ from alpakka.wools import Wool
 from alpakka.templates import template_var, create_context
 
 WOOLS = alpakka.WOOLS
-
-# configuration for logging
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
 
 class NodeWrapperMeta(type):
@@ -44,7 +40,7 @@ class NodeWrapperMeta(type):
         # Give every class reference to its Wools for easy access
         cls.WOOL = wool
 
-        wrapdict = wool._yang_wrappers
+        wrapdict = wool.yang_wrappers
 
         # If we have an explicit class SomeWrapper(..., yang=<yang name>)
         # relation, then just add it to the wrapper dict
