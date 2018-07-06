@@ -1,6 +1,7 @@
 import logging
 
-formatter = logging.Formatter("alpakka [%(module)s, %(levelname)s]: %(message)s")
+formatter = logging.Formatter("alpakka [%(module)s, %(levelname)s]: "
+                              "%(message)s")
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 
