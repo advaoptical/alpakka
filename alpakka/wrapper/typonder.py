@@ -2,7 +2,7 @@ from alpakka.wrapper.nodewrapper import NodeWrapper
 from alpakka.wrapper.nodewrapper import Listonder
 from alpakka.templates import template_var
 from collections import OrderedDict
-import re
+import pyang.types
 
 
 class Typonder(NodeWrapper):
@@ -31,7 +31,7 @@ class Typonder(NodeWrapper):
         if type_stmt:
             data_types = self.WOOL.data_type_mappings
             # processing if the yang type is a base type
-            if type_stmt.arg in data_types:
+            if pyang.types.is_base_type(type_stmt.arg):
                 self.data_type = data_types[type_stmt.arg]
                 self.is_build_in_type = True
             # processing if the yang type is typedef
@@ -129,7 +129,7 @@ class Union(Typonder, yang='union'):
         # list of types that belong to the union
         self.types = OrderedDict()
         for stmt in statement.search('type'):
-            if stmt.arg in self.WOOL.data_type_mappings:
+            if pyang.types.is_base_type(stmt.arg):
                 wool_data_type = self.WOOL.data_type_mappings[stmt.arg]
                 self.types[wool_data_type] = wool_data_type
             elif stmt.arg in self.top().derived_types.keys():

@@ -1,9 +1,5 @@
 import re
-
-DEFAULT_TYPES = {'binary', 'bits', 'boolean', 'decimal64', 'empty',
-                 'enumeration', 'identityref', 'instance-identifier', 'int8',
-                 'int16', 'int32', 'int64', 'leafref', 'string', 'uint8',
-                 'uint16', 'uint32', 'uint64', 'union'}
+import pyang.types
 
 
 class Types:
@@ -25,11 +21,8 @@ class Types:
         for yang_pattern, data_type in self.patterns:
             if re.match(yang_pattern, yang_type):
                 return data_type
-        if yang_type in DEFAULT_TYPES:
+        if pyang.types.is_base_type(yang_type):
             return yang_type
-
-    def __iter__(self):
-        return DEFAULT_TYPES.__iter__()
 
 
 class Wool(object):
