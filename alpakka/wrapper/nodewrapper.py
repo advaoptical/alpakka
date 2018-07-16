@@ -86,13 +86,28 @@ class NodeWrapperMeta(type):
 
         Accessing a wrapper class through a Wool will automagically create a
         derived class with all the applicable mixins as additional (higher
-        priority) base classes:
+        priority) base classes
 
-        >>> dummy = pyang.statements.Statement(
+        This dynamic class creation process is cached. If there might be a
+        need to clear the cache for whatever reason, you can do so with:
+
+        >>> Wool._woolify.cache_clear()
+
+        The new class gets a special ``.__module__`` name referring to the
+        alpakka.WOOLS registry:
+
+        >>> WOOLS.default.Module.mro()
+        [<class '...WOOLS['default'].Module'>, <class '...SomeMixin'>, ...]
+
+        And after instantiation, all additional mixin features are available:
+
+        >>> _dummy = __import__('pyang').statements.Statement(
         ...     None, None, None, 'module', 'some-module')
-        >>> WOOLS.default.Module(dummy).__class__.mro()
-        [<class '...WOOLS['default'].Module'>, <class '...SomeMixin'>, <class '...Module'>...]
-        >>> WOOLS.default.Module(dummy).upper_name()
+
+        >>> wrapped_module =  WOOLS.default.Module(_dummy)
+        >>> wrapped_module.yang_name()
+        'some-module'
+        >>> wrapped_module.upper_name()
         'SOME-MODULE'
 
         :return: The original `mixincls` object
@@ -118,7 +133,9 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
     customized wool:
 
     >>> WOOLS.default['some-node']
-    <class 'alpakka.wrapper.nodewrapper.SomeNode'>
+    <class 'alpakka.WOOLS['default'].SomeNode'>
+    >>> WOOLS.default['some-node'].mro()
+    [..., <class 'alpakka.wrapper.nodewrapper.SomeNode'>, ...]
     """
     prefix = ""
 
