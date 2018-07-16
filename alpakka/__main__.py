@@ -7,6 +7,11 @@ import alpakka.commands
 import alpakka.pyang_plugins
 
 
+# auto-load all Wools which are defined as 'alpakka_wools' entry points in
+# their distribution's setuptools.setup()
+alpakka.wools.load_from_entry_points()
+
+
 # Parse command line for pure non-pyang-invoking alpakka command flags
 ALPAKKA_COMMAND_ARGS, _ = alpakka.commands.PARSER.parse_known_args()
 
