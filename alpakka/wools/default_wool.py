@@ -1,5 +1,4 @@
 from functools import lru_cache
-from orderedset import OrderedSet
 import re
 import pyang.types
 

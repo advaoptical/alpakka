@@ -5,6 +5,7 @@ from path import Path
 
 import alpakka.commands
 import alpakka.pyang_plugins
+import alpakka.wools
 
 
 # auto-load all Wools which are defined as 'alpakka_wools' entry points in

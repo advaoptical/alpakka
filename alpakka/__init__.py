@@ -1,7 +1,6 @@
 __all__ = ['WOOLS', 'LOGGER', 'NodeWrapper', 'Wool', 'run']
 
 from alpakka.logger import LOGGER
-import alpakka.wools
 from alpakka.wools import WoolsRegistry, Wool
 
 #: The central Wool registry. ``WOOLS.default`` is the basic Wool. All Wool
