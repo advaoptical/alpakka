@@ -1,6 +1,5 @@
 from alpakka.wrapper.nodewrapper import NodeWrapper
 from alpakka.wrapper.nodewrapper import Listonder
-from alpakka.templates import template_var
 from collections import OrderedDict
 import pyang.types
 
@@ -58,7 +57,6 @@ class Typonder(NodeWrapper):
                     (i.substmts[0].arg for i in statement.substmts if
                      i.keyword == 'type'), None)
 
-    @template_var
     def default_value(self):
         """
         Methode that returns the default value of a node if present
@@ -68,7 +66,6 @@ class Typonder(NodeWrapper):
         for item in self.statement.search('default'):
             return item.arg
 
-    @template_var
     def is_mandatory(self):
         """
         Methodes that returns the True if the node was selected to be

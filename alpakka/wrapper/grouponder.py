@@ -1,6 +1,5 @@
 from alpakka.wrapper.nodewrapper import NodeWrapper
 from alpakka.wrapper.nodewrapper import Listonder
-from alpakka.templates import template_var
 from collections import OrderedDict
 from alpakka.logger import LOGGER
 import alpakka
@@ -118,7 +117,6 @@ class Grouponder(NodeWrapper):
         return super().__dir__() + [key.replace('-', '_') for key in
                                     self.children]
 
-    @template_var
     def all_children(self):
         """
         Collects a list of all child stmts of the current stmt regardless of

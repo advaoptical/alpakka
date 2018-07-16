@@ -12,7 +12,6 @@ setup(
         'alpakka.pyang_plugins',
         'alpakka.wrapper',
         'alpakka.wools',
-        'alpakka.templates',
     ],
     entry_points={
         'console_scripts': ['alpakka=alpakka:run'],

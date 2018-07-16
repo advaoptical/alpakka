@@ -4,7 +4,6 @@ from orderedset import OrderedSet
 
 import alpakka
 from alpakka.wools import Wool
-from alpakka.templates import template_var, create_context
 
 WOOLS = alpakka.WOOLS
 
@@ -156,23 +155,15 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
                                                     OrderedDict())
             nodes[self.generate_key()] = self
 
-    @property
-    def template_context(self):
-        return create_context(self)
-
-    @template_var
     def yang_name(self):
         return self.statement.arg
 
-    @template_var
     def yang_type(self):
         return self.statement.keyword
 
-    @template_var
     def yang_module(self):
         return (self.statement.top or self.statement).i_modulename
 
-    @template_var
     def top(self):
         """
         Find the root wrapper object by walking the tree recursively
