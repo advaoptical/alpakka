@@ -1,5 +1,6 @@
 import sys
 from collections import OrderedDict
+from orderedset import OrderedSet
 
 import alpakka
 from alpakka.wools import Wool
@@ -18,20 +19,31 @@ class NodeWrapperMeta(type):
     See :class:`NodeWrapper` for usage examples
     """
 
+    mixins = {}
+
     def __new__(mcs, clsname, bases, clsattrs, *args, yang=None):
-        return type.__new__(mcs, clsname, bases, clsattrs, *args)
+        # To support mixins in bases, we need a new metaclass derived from all
+        # the base metaclasses (OrderedSet filters out duplicates)
+        class Meta(*OrderedSet((mcs, *(type(b) for b in bases)))):
+            mixins = {}
+
+        return type.__new__(Meta, clsname, bases, clsattrs, *args)
 
     def __init__(cls, clsname, bases, clsattrs, *args, yang=None):
         type.__init__(cls, clsname, bases, clsattrs, *args)
 
+        module = sys.modules.get(cls.__module__)
+        if module is None:
+            return
+
         # To get registered, the class must NOT be defined in sub-packages
         # (sub-directories) of this basic wrapper package or a wool package.
         # Only classes from sub-modules (.py files) are allowed
-        pkgname = sys.modules[cls.__module__].__package__
+        pkgname = module.__package__
         if pkgname == sys.modules[__name__].__package__:
             wool = getattr(WOOLS, 'default', None)
             if wool is None:
-                wool = WOOLS.default = Wool('default', __name__)
+                wool = WOOLS.default = Wool('default', __package__)
         elif pkgname in WOOLS:
             wool = WOOLS[pkgname]
         else:
@@ -56,6 +68,41 @@ class NodeWrapperMeta(type):
                 if wrapcls is base:
                     wrapdict[yangname] = cls
 
+    def mixin(cls, mixincls):
+        """
+        Class decorator for defining YANG node wrapper plugins in Wools.
+
+        Any class in the wrapper hierarchy can be extended with mixins:
+
+        >>> @NodeWrapper.mixin
+        ... class SomeMixin:
+        ...     def upper_name(self):
+        ...         return self.yang_name().upper()
+
+        Mixins are stored by their Wool package name in the wrapper class'
+        meta ``.mixins`` dictionary:
+
+        >>> NodeWrapper.mixins
+        {...'alpakka.wrapper': [<class '...SomeMixin'>]...}
+
+        Accessing a wrapper class through a Wool will automagically create a
+        derived class with all the applicable mixins as additional (higher
+        priority) base classes:
+
+        >>> dummy = pyang.statements.Statement(
+        ...     None, None, None, 'module', 'some-module')
+        >>> WOOLS.default.Module(dummy).__class__.mro()
+        [<class '...WOOLS['default'].Module'>, <class '...SomeMixin'>, <class '...Module'>...]
+        >>> WOOLS.default.Module(dummy).upper_name()
+        'SOME-MODULE'
+
+        :return: The original `mixincls` object
+        """
+        pkgname = sys.modules[mixincls.__module__].__package__
+        if pkgname == sys.modules[__name__].__package__ or pkgname in WOOLS:
+            type(cls).mixins.setdefault(pkgname, []).append(mixincls)
+        return mixincls
+
 
 class NodeWrapper(metaclass=NodeWrapperMeta):
     """
@@ -76,7 +123,7 @@ class NodeWrapper(metaclass=NodeWrapperMeta):
     """
     prefix = ""
 
-    def __init__(self, statement, parent):
+    def __init__(self, statement, parent=None):
         """
         The Constructor for NodeWrapper object.
 

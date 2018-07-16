@@ -5,7 +5,7 @@ setup(
     version='0.1.dev',
     description="Cutest YANG Eater alive",
 
-    install_requires=['pyang', 'path.py', 'ipython'],
+    install_requires=['pyang', 'path.py', 'ipython', 'orderedset'],
 
     packages=[
         'alpakka',

@@ -1,3 +1,5 @@
+from functools import lru_cache
+from orderedset import OrderedSet
 import re
 import pyang.types
 
@@ -46,7 +48,7 @@ class Wool(object):
         self.parent = parent
         self.output_path = ''
         self.config = {}
-        self.data_type_mappings = Types(type_patterns)
+        self.data_type_mappings = Types(type_patterns or {})
         self.yang_wrappers = parent and dict(parent.yang_wrappers) or {}
 
     def id(self):
@@ -55,58 +57,73 @@ class Wool(object):
         """
         return self.name.lower()
 
-    def _selfify(self, wrapcls):
+    @lru_cache()
+    def _woolify(self, wrapcls):
         """
-        Check if ``.WOOL`` reference of given
-        :class:`alpakka.NodeWrapper`-derived `wrapcls` is `self`, and if not,
-        override the ``.WOOL`` reference
+        Woolify the given :class:`alpakka.NodeWrapper`-derived `wrapcls`.
 
-        :return: given `wrapcls` with correct ``.WOOL`` reference
-        """
-        if wrapcls.WOOL is not self:
-            wrapcls.WOOL = self
-        return wrapcls
+        Dynamically derive a new class from `wrapcls` and all ``.mixins``
+        for this Wool and its parents defined by `wrapcls` and all its bases
+
+        Finally add a ``.WOOL`` reference to the new class
+
+        :return: A cached woolified class derived from `wrapcls`
+         """
+        # Can't be imported at module level due to unsatisfied circular
+        # dependencies
+        import alpakka.wrapper
+
+        mixins = []
+        for base in wrapcls.mro():
+            if issubclass(base, alpakka.wrapper.NodeWrapper):
+                wool = self
+                while wool is not None:
+                    for mixincls in base.mixins.get(wool.package, ()):
+                        mixins.append(mixincls)
+                    wool = wool.parent
+
+        return type(wrapcls.__name__, (*mixins, wrapcls), {
+            '__module__': "alpakka.WOOLS['{}']".format(self.name),
+            'WOOL': self})
 
     def __getitem__(self, name):
         """
-        Get the Wool's YANG node wrapper class for given YANG statement `name`
+        Get the Woolified YANG node wrapper class for YANG statement `name`.
 
-        If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
+        See :meth:`._woolify` for Woolification details
         """
-        return self._selfify(self.yang_wrappers[name])
+        return self._woolify(self.yang_wrappers[name])
 
     def get(self, name):
         """
-        Get the Wool's YANG node wrapper class for given YANG statement
-        `name`, returning ``None`` if it can't be found, instead of raising an
+        Get the Woolified YANG node wrapper class for YANG statement `name`.
+
+        Returns ``None`` if no wrapper can be found instead of raising an
         exception
 
-        If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
+        See :meth:`._woolify` for Woolification details
         """
         wrapcls = self.yang_wrappers.get(name)
         if wrapcls is not None:
-            return self._selfify(wrapcls)
+            return self._woolify(wrapcls)
 
     def __getattr__(self, name):
         """
-        Get the Wool's YANG node wrapper class that has given class `name`,
-        instead of YANG statement name
+        Get the Woolified YANG node wrapper class with given `name`.
 
-        If the class comes from a parent Wool and therefore doesn't have this
-        Wool as ``.WOOL`` reference, the ``.WOOL`` will be overridden
+        See :meth:`._woolify` for Woolification details
         """
         for wrapcls in self.yang_wrappers.values():
             if wrapcls.__name__ == name:
-                return self._selfify(wrapcls)
+                return self._woolify(wrapcls)
 
         raise AttributeError(name)
 
     def __dir__(self):
         """
-        Extend basic ``__dir__`` with all YANG node wrapper class names of
-        this Wool, for use with :meth:`.__getattr__`
+        Add all YANG node wrapper class names of this Wool.
+
+        For use with :meth:`.__getattr__`
         """
         return super().__dir__() + [wrapcls.__name__ for wrapcls in
                                     getattr(self, 'yang_wrappers',
