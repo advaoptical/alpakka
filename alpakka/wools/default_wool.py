@@ -67,7 +67,7 @@ class Wool(object):
         Finally add a ``.WOOL`` reference to the new class
 
         :return: A cached woolified class derived from `wrapcls`
-         """
+        """
         # Can't be imported at module level due to unsatisfied circular
         # dependencies
         import alpakka.wrapper
@@ -81,7 +81,22 @@ class Wool(object):
                         mixins.append(mixincls)
                     wool = wool.parent
 
-        return type(wrapcls.__name__, (*mixins, wrapcls), {
+        bases = (*mixins, wrapcls)
+        # We also need a new metaclass derived from all the metaclasses of the
+        # bases, but w/o duplicates or metaclasses that are superclasses of
+        # others in the list of base metaclasses
+        metabases = []
+        for meta in map(type, bases):
+            metabases = [
+                mb for mb in metabases
+                if not issubclass(meta, mb)]
+            if meta not in metabases:
+                metabases.append(meta)
+
+        class Meta(*metabases):
+            pass
+
+        return Meta(wrapcls.__name__, (*mixins, wrapcls), {
             '__module__': "alpakka.WOOLS['{}']".format(self.name),
             'WOOL': self})
 
