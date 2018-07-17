@@ -1,6 +1,5 @@
 import sys
 from collections import OrderedDict
-from orderedset import OrderedSet
 
 import alpakka
 from alpakka.wools import Wool
@@ -21,9 +20,17 @@ class NodeWrapperMeta(type):
     mixins = {}
 
     def __new__(mcs, clsname, bases, clsattrs, *args, yang=None):
-        # To support mixins in bases, we need a new metaclass derived from all
-        # the base metaclasses (OrderedSet filters out duplicates)
-        class Meta(*OrderedSet((mcs, *(type(b) for b in bases)))):
+        # To support @NodeWrapper.mixin classes in bases, we need a new
+        # metaclass additionally derived from all the metaclasses of the
+        # bases, but w/o duplicates or metaclasses that are superclasses of
+        # others in the list of base metaclasses
+        metabases = [mcs]
+        for meta in map(type, bases):
+            metabases = [mb for mb in metabases if not issubclass(meta, mb)]
+            if meta not in metabases:
+                metabases.append(meta)
+
+        class Meta(*metabases):
             mixins = {}
 
         return type.__new__(Meta, clsname, bases, clsattrs, *args)
