@@ -3,7 +3,6 @@ from alpakka.wrapper.nodewrapper import Listonder
 from collections import OrderedDict
 from alpakka.logger import LOGGER
 import alpakka
-import itertools
 
 WOOLS = alpakka.WOOLS
 
@@ -116,9 +115,9 @@ class Grouponder(NodeWrapper):
 
         :return: list of elements that are in the children list
         """
-        return itertools.chain(super().__dir__(),
-                               [key.replace('-', '_') for key in
-                                getattr(self, 'children', dict())])
+        return (*super().__dir__(),
+                *(key.replace('-', '_') for key in
+                  getattr(self, 'children', dict())))
 
     def all_children(self):
         """

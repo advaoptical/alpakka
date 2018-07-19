@@ -141,9 +141,9 @@ class Wool(object):
 
         For use with :meth:`.__getattr__`
         """
-        return super().__dir__() + [wrapcls.__name__ for wrapcls in
-                                    getattr(self, 'yang_wrappers',
-                                            dict()).values()]
+        return (*super().__dir__(),
+                *(wrapcls.__name__ for wrapcls in
+                  getattr(self, 'yang_wrappers', dict()).values()))
 
     def __repr__(self):
         """
