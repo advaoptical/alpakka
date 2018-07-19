@@ -1,3 +1,4 @@
+from alpakka.logger import LOGGER
 from functools import lru_cache
 import re
 import pyang.types
@@ -49,6 +50,7 @@ class Wool(object):
         self.config = {}
         self.data_type_mappings = Types(type_patterns or {})
         self.yang_wrappers = parent and dict(parent.yang_wrappers) or {}
+        LOGGER.debug("Wool created: %s" % name)
 
     def id(self):
         """
