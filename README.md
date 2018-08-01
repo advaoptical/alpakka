@@ -46,31 +46,24 @@ Python (version 3.5 or newer), pip and git are required to use this project.
 
 ## Running Alpakka
 
-#### comandlinecall
-
-The *alpakka* project could be called from the command line terminal by typing
+*alpakka* can be launched from the command line by typing:
 ```
 	alpakka <options> <YANG source file>
 ```
-#### possible options
+### Available Options
 
 The *alpakka* project provides the following command line options
 
-* '--alpakka-output-path' (**required**)
-	- output path for the generated classes
-	- indicates the root directory of the java/maven project
-
 * '-w; --wool' (**required**)
-	- The Wool to use for knitting the code
-	- indicates to wool, which is representing the different programming languages and frameworks
+	- The wool used for knitting the code
+	- specifies the required wool for the target programming language and framework
 
-* '--wool-package-prefix'
-	- package prefix to be prepended to the generated classes
-	- could be for example the java name prefix like com.example
-
-* '--akka-beans-only'
-	- @Thomas was macht diese Option eigentlich?
+* '--output-path' (**required**)
+	- output path for the generated classes
+	- specifies the root directory used for the code generation
 
 * '-i; --interactive'
 	- run alpakka in interactive mode by starting an IPython shell before template generation
 
+* '--configuration-file-location'
+	- path of the wool configuration file

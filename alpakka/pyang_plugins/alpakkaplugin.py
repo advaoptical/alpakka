@@ -42,11 +42,13 @@ class AlpakkaPlugin(plugin.PyangPlugin):
         options = [
             optparse.make_option(
                 "-w", "--wool", action="store", dest="wool",
-                help="The Wool to use for knitting the code"
+                help="wool used for knitting the code. Specifies the wool "
+                     "required for the target programming language and "
+                     "framework."
             ),
             optparse.make_option(
                 "--output-path", dest="output", action="store",
-                help="output path for the generated classes"
+                help="specifies the root directory for the code generation"
             ),
             optparse.make_option(
                 "-i", "--interactive", action="store_true", dest="interactive",
@@ -56,7 +58,7 @@ class AlpakkaPlugin(plugin.PyangPlugin):
             ),
             optparse.make_option(
                 "--configuration-file-location", action="store",
-                dest="config_file", help="path for the wool configuration file"
+                dest="config_file", help="path of the wool configuration file"
             )
         ]
         group = optparser.add_option_group("Akka output specific options")

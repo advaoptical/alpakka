@@ -28,7 +28,7 @@ def command(func):
 def list_wools():
     """
     List all registered Wools for knitting code
-    Fixme: Does not work, missing ID
+    FIXME: Does not work, missing ID
     """
     for name, wool in alpakka.WOOLS.items():
         print("[{}] {!r}".format(name, wool))
