@@ -1,5 +1,5 @@
 from alpakka.wrapper import wrap_module
-from alpakka.wrapper.nodewrapper import Module
+from alpakka.wrapper.grouponder import Module
 from collections import OrderedDict
 
 
@@ -26,30 +26,33 @@ class TestModule:
     def test_all_nodes(self, yang_module):
         wrapped_module = wrap_module(yang_module)
         assert 'module' not in wrapped_module.all_nodes
-        assert sorted(['topologies', 'endpoints']) == sorted(
-            [i.rsplit('/', 1)[1] for i in
-             wrapped_module.all_nodes['container'].keys()])
-        assert sorted(['intent-group']) == sorted(
-            [i.rsplit('/', 1)[1] for i in
-             wrapped_module.all_nodes['grouping'].keys()])
-        assert sorted(['endpoints']) == sorted(
-               [i.rsplit('/', 1)[1] for i in
-                wrapped_module.all_nodes['leaf-list'].keys()])
-        assert sorted(['intents', 'installed-topologies', 'assigned-endpoints',
-                       'intents']) == sorted(
-               [i.rsplit('/', 1)[1] for i in
-                wrapped_module.all_nodes['list'].keys()])
-        assert (sorted(['endpoint-identifier', 'intent-identifier',
-                        'topology-identifier', 'bit-rate', 'disjoint']) ==
-                sorted([i.rsplit('/', 1)[1] for i in
-                        wrapped_module.all_nodes['typedef'].keys()]))
-        assert (sorted(['endpoint-id', 'protection', 'minimum-paths',
-                        'flexible-bandwidth', 'dedicated-bandwidth',
-                        'intent-id', 'disjoint-paths', 'satisfied',
-                        'maximum-active-connections',
-                        'topology-id']) ==
-                sorted([i.rsplit('/', 1)[1] for i in
-                        wrapped_module.all_nodes['leaf'].keys()]))
+        assert {'topologies', 'endpoints'} == {
+            i.rsplit('/', 1)[1] for i in
+            wrapped_module.all_nodes['container'].keys()}
+        assert {'intent-group'} == {
+            i.rsplit('/', 1)[1] for i in
+            wrapped_module.all_nodes['grouping'].keys()}
+        assert {'endpoints'} == {
+            i.rsplit('/', 1)[1] for i in
+            wrapped_module.all_nodes['leaf-list'].keys()}
+        assert {
+            'intents', 'installed-topologies', 'assigned-endpoints',
+            'intents'} == {
+            i.rsplit('/', 1)[1] for i in
+            wrapped_module.all_nodes['list'].keys()}
+        assert {
+            'endpoint-identifier', 'intent-identifier',
+            'topology-identifier', 'bit-rate', 'disjoint'} == {
+            i.rsplit('/', 1)[1] for i in
+            wrapped_module.all_nodes['typedef'].keys()}
+        assert {
+            'endpoint-id', 'protection', 'minimum-paths',
+            'flexible-bandwidth', 'dedicated-bandwidth',
+            'intent-id', 'disjoint-paths', 'satisfied',
+            'maximum-active-connections',
+            'topology-id'} == {
+            i.rsplit('/', 1)[1] for i in
+            wrapped_module.all_nodes['leaf'].keys()}
 
     def test_yang_type(self, yang_module):
         wrapped_module = wrap_module(yang_module)
