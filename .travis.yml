@@ -1,0 +1,19 @@
+language: python
+python:
+  - '3.5'
+  - '3.6'
+  - '3.7'
+
+install:
+  - pip install -U pip setuptools
+  - pip install -e .
+  - pip install -r requirements.test.txt
+
+script:
+  - py.test -vv alpakka --cov --doctest-modules
+
+deploy:
+  provider: pypi
+  user: advaoptical
+  password:
+    secure: Px1H/qvTWsrTtgOa95N9mjJOdv61ylRP8UUCWFlHletQzswCu7d6XbXu+eSNkp6DmbrcD0z7hneiwy/VtBdLtoZh2epMunmq7jEL8yTJRNBhHKngBeUivJWgurL7AJAmArhM+471GFdXDr+ybIFtv3x8uxtulb57qqaeIOFOrUNyiGOG67KR9lGiOV1Eh/FSRxAnmjrRY3r0rHQLjjBHRtmSsFBkf5uENwWyRyNrEEpezZ5pAnnmJ+ujP48peCY5SwnlZ97kZuVDHOlVIK/sx4Ly6+OE+Y/wOH302+6rAb8ktlUShly9zjiTvZNcCH7kcfgPmmSyeeYVyoTt8nXvPOcKkcAhoYKwhW8wAV8AH1WvUW9bfx470g2IfxGDeB+YnIyu0ROzM3nGD/I1G1PwkhHRFSrNlLqkPdJaukkCcvHWDeu0lkEBgvaATm5IDqi4O8XWGN0nWmvGKq8VjBCiZoSMtwXPoNpCxP2hBz3rnSDn0EA1zx+Vbn/qEeZuy2I5vGm8lYPGLOGfpboVPUlDAHcVmw1FuOcXPDkOT9kb4DlY5xwKShQ2e3tgVRJMyaV1Eb+oGvTLnsm4LT8BFfjzHip3gitdVP7hz/B0OCWDBdNgQCzRN3QRJzf27bwSVskPsULN4pnA/RvFzgtCneQg1TcRcxYq+sUNM8x8fcvSZo0=
