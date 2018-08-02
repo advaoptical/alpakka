@@ -3,6 +3,9 @@ python:
   - '3.5'
   - '3.6'
 
+git:
+  depth: false
+
 install:
   - pip install -U pip setuptools
   - pip install -r requirements.setup.txt
