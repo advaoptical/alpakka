@@ -1,5 +1,17 @@
 # Alpakka
 
+[![](https://img.shields.io/pypi/pyversions/alpakka.svg)](
+	https://python.org)
+[![](https://img.shields.io/pypi/v/alpakka.svg)](
+	https://pypi.python.org/pypi/alpakka)
+
+> Licensed under the [Apache License, Version 2.0](
+	http://www.apache.org/licenses/LICENSE-2.0)
+
+[![Travis CI Build Status](
+	https://travis-ci.org/advaoptical/alpakka.svg?branch=master)](
+		https://travis-ci.org/advaoptical/alpakka)
+
 Alpakka is a python project that extends pyang to automatically generate code skeletons from YANG statements. The primary goal is to generate code skeletons for the configuration of networks and network devices which are controlled by NETCONF or RESCONF.
 
 ## Getting Started
