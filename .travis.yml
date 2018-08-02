@@ -6,6 +6,7 @@ python:
 
 install:
   - pip install -U pip setuptools
+  - pip install -r requirements.setup.txt
   - pip install -e .
   - pip install -r requirements.test.txt
 
