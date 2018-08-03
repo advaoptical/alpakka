@@ -27,13 +27,13 @@ Python (version 3.5 or newer), pip and git are required to use this project.
 * The first step is to clone the two required repositories. The first repository is the *alpakka* project. It contains the wrapping engine and the required functionality to map YANG statements into the wrapped representation for the code generation step.
 
 ```
-	git clone http://mgn-s-at-source.advaoptical.com/gitlab/anden/alpakka.git
+	git clone https://github.com/advaoptical/alpakka.git
 ```
 
 * The second step is to clone the *wools* project. It adapts the wrapping engine of the *alpakka* project by applying specific handling for different programming languages and frameworks and implements the code generation process itself.
 
 ```
-	git clone http://mgn-s-at-source.advaoptical.com/gitlab/anden/wools.git
+	git clone https://github.com/advaoptical/wools.git
 ```
 
 * The next step is to install both projects and the required dependencies. It is recommended to install the *alpakka* project first and then the *wools* project. An example is given assuming that you cloned both repositories in your current folder. In case you want to work on the code of *alpakka* the `-e` flag can be used for the pip commands.
