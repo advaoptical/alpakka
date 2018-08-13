@@ -31,33 +31,52 @@ The following steps guide you through the installation process. Please be aware 
 
 ### Prerequisites
 
-Python (version 3.5 or newer), pip and git are required to follow the guide and use the code from this repository.
+Python (version 3.5 or newer), [pip], and optionally [git] are required to follow the guide and use the code from this repository.
+
+[pip]: https://pip.pypa.io
+
+[git]: https://git-scm.com
 
 ### Installing
 
-* The first step is to clone the two required repositories. The first repository is the `alpakka` project. It contains the wrapping engine and the basic functionality to map YANG statements to their wrapped representation for the code generation step.
+* The first step is to install the two required packages. The first is the `alpakka` project itself. It contains the wrapping engine and the basic functionality to map YANG statements to their wrapped representation for the code generation step.
 
   ```console
-  git clone https://github.com/advaoptical/alpakka.git
+  pip install alpakka
   ```
 
-* The second step is to clone the `wools` project. It adapts the wrapping engine of `alpakka` by applying specific handling for different programming languages and frameworks and implements the code generation process itself.
+* The second requirement is the `wools` package. It adapts the wrapping engine of `alpakka` by applying specific handling for different programming languages and frameworks and implements the code generation process itself.
 
   ```console
-  git clone https://github.com/advaoptical/wools.git
-  ```
-
-* The next step is to install both projects and the required dependencies. It is recommended to install the *alpakka* project first and then the `wools` project. An example is given assuming that you cloned both repositories into the current folder. In case you want to work on the code of *alpakka* the `-e` flag can be used for the pip commands.
-
-  ```console
-  pip install ./alpakka
-  pip install ./wools
+  pip install wools
   ```
 
 * After the installation of both projects is finished, you can verify that everything is installed correctly by listing all installed python packages:
 
   ```console
   pip list
+  ```
+
+### Contributing
+
+* If you want to contribute to the `alpakka` project or further customize it, then you should clone the two required repositories.
+
+  ```console
+  git clone https://github.com/advaoptical/alpakka.git
+  git clone https://github.com/advaoptical/wools.git
+  ```
+
+* The next step is to install both projects in development mode. It is recommended to install the `alpakka` project first and then the `wools` project. The following commands assume that you cloned both repositories into the current folder.
+
+  ```console
+  pip install -e ./alpakka
+  pip install -e ./wools
+  ```
+
+* In this case, you can verify that everything is installed correctly by listing all python packages that are installed in development mode:
+
+  ```console
+  pip list -e
   ```
 
 ## Running Alpakka
