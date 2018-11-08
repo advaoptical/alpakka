@@ -1,10 +1,14 @@
 coala:
   image: coala/base
+  tags:
+    - docker
   script:
     - coala --ci
 
 pytest:
   image: python:3.6
+  tags:
+    - docker
   script:
     - pip install -U pip setuptools
     - pip install -e .
