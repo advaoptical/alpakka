@@ -14,7 +14,7 @@ setup(
     setup_requires=open('requirements.setup.txt'),
     install_requires=['pyang', 'path.py', 'ipython'],
 
-    use_scm_version={'local_scheme': lambda _: ''},
+    use_scm_version={'local_scheme': 'dirty-tag'},
 
     packages=[
         'alpakka',
