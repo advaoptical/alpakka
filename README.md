@@ -109,7 +109,7 @@ alpakka <options> <YANG source file>
 
   * path of the wool configuration file
 
-In addition, there is currently one relevant parameter inherited from [pyang]:
+In addition, there is currently one relevant parameter inherited from [pyang]
 
 * `--path` (**inherited**)
 
