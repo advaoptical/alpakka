@@ -109,6 +109,12 @@ alpakka <options> <YANG source file>
 
   * path of the wool configuration file
 
+In addition, there is currently one relevant parameter inherited from [pyang]:
+
+* `--path` (**inherited**)
+
+  * search path for imported modules
+
 ## Known Limitations
 
 In some cases, `alpakka` does not provide the correct result if augmentation is used. This will be fixed in one of the upcoming releases.
