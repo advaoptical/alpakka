@@ -1,0 +1,39 @@
+class {{{className}}}Meta(type):
+    """Metaclass for REST/YANG/JSON container handler class."""
+
+    {{#each containerMembers}}
+    from .{{{this.pythonName}}} import {{{this.className}}}
+    {{/each}}
+
+    {{#each listMembers}}
+    from .{{{this.pythonName}}} import {{{this.className}}}
+    {{/each}}
+
+class {{{className}}}(metaclass={{{className}}}Meta):
+    """REST/YANG/JSON container handler class."""
+
+    _json: dict = None
+
+    def __init__(self, json_dict):
+        self._json = json_dict
+
+    @property
+    def yang_name(self):
+        return '{{{yangName}}}'
+
+    {{#each containerMembers}}
+    @property
+    def {{{this.pythonName}}}(self):
+        return type(self).{{{this.className}}}(
+            this._json.get('{{{this.yangName}}}'))
+
+    {{/each}}
+
+    {{#each listMembers}}
+    @property
+    def {{{this.pythonName}}}(self):
+        return [
+            type(self).{{{this.className}}}(json_dict)
+            for json_dict in this._json.get('{{{this.yangName}}}', ())]
+
+    {{/each}}

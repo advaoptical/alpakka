@@ -1,0 +1,42 @@
+plugins {
+    id 'application'
+    id 'groovy'
+    id 'java'
+    id 'maven-publish'
+}
+
+apply plugin: 'application'
+apply plugin: 'groovy'
+apply plugin: 'java'
+apply plugin: 'maven-publish'
+
+
+group = "com.adva"
+version = "0.1.0-SNAPSHOT"
+
+application {
+    mainClassName = "com.adva.alpakka.Main"
+}
+
+sourceCompatibility = 17
+targetCompatibility = 17
+
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    localGroovy()
+
+    implementation 'commons-io:commons-io:2.11.0'
+    implementation 'one.util:streamex:0.8.1'
+
+    implementation 'com.github.jknack:handlebars:4.3.0'
+
+    implementation 'org.opendaylight.mdsal:mdsal-binding-java-api-generator:8.0.15'
+    implementation 'org.opendaylight.mdsal:mdsal-binding-runtime-spi:8.0.15'
+
+    testImplementation 'org.spockframework:spock-core:2.1-M4-groovy-3.0'
+}
