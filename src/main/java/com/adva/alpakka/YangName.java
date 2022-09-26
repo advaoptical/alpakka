@@ -1,32 +1,41 @@
 package com.adva.alpakka;
 
 import javax.annotation.Nonnegative;
-import javax.annotation.Nonnull;
+
+import lombok.Getter;
+import lombok.NonNull;
 
 import one.util.streamex.StreamEx;
 import org.apache.commons.lang3.StringUtils;
 
+import org.opendaylight.yangtools.yang.common.QName;
+import org.opendaylight.yangtools.yang.common.XMLNamespace;
+
 
 public class YangName implements CharSequence {
 
-    @Nonnull
+    @NonNull
     private final String name;
 
-    public YangName(@Nonnull final String name) {
-        this.name = name;
+    @NonNull @Getter
+    private final XMLNamespace namespace;
+
+    public YangName(@NonNull final QName qName) {
+        this.name = qName.getLocalName();
+        this.namespace = qName.getNamespace();
     }
 
-    @Nonnull
+    @NonNull
     public String toPythonName() {
         return this.name.replace('-', '_');
     }
 
-    @Nonnull
+    @NonNull
     public String toPythonClassName() {
         return StreamEx.of(this.name.split("-")).map(StringUtils::capitalize).joining();
     }
 
-    @Nonnull @Override
+    @NonNull @Override
     public String toString() {
         return this.name;
     }
@@ -41,7 +50,7 @@ public class YangName implements CharSequence {
         return this.name.charAt(index);
     }
 
-    @Nonnull @Override
+    @NonNull @Override
     public CharSequence subSequence(@Nonnegative final int start, @Nonnegative final int end) {
         return this.name.subSequence(start, end);
     }
