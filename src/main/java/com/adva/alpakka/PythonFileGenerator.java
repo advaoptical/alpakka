@@ -8,17 +8,16 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import javax.annotation.Nonnull;
+import lombok.NonNull;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
+import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
 
 import com.github.jknack.handlebars.Handlebars;
 import com.github.jknack.handlebars.helper.StringHelpers;
-import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
+import one.util.streamex.EntryStream;
 
-import one.util.streamex.StreamEx;
-import org.apache.commons.io.file.PathUtils;
 import org.opendaylight.yangtools.plugin.generator.api.FileGenerator;
 import org.opendaylight.yangtools.plugin.generator.api.FileGeneratorException;
 import org.opendaylight.yangtools.plugin.generator.api.GeneratedFile;
@@ -26,42 +25,46 @@ import org.opendaylight.yangtools.plugin.generator.api.GeneratedFilePath;
 import org.opendaylight.yangtools.plugin.generator.api.GeneratedFileType;
 import org.opendaylight.yangtools.plugin.generator.api.ModuleResourceResolver;
 
-import org.opendaylight.yangtools.yang.data.api.schema.DataContainerNode;
-import org.opendaylight.yangtools.yang.model.api.*;
+import org.opendaylight.yangtools.yang.model.api.ContainerSchemaNode;
+import org.opendaylight.yangtools.yang.model.api.DataNodeContainer;
+import org.opendaylight.yangtools.yang.model.api.DataSchemaNode;
+import org.opendaylight.yangtools.yang.model.api.EffectiveModelContext;
+import org.opendaylight.yangtools.yang.model.api.LeafSchemaNode;
+import org.opendaylight.yangtools.yang.model.api.ListSchemaNode;
 import org.opendaylight.yangtools.yang.model.api.Module;
 
 
 public class PythonFileGenerator implements FileGenerator {
 
-    @Nonnull
+    @NonNull
     private static final Handlebars HANDLEBARS = new Handlebars().with(new ClassPathTemplateLoader("/templates"))
             .registerHelpers(StringHelpers.class)
             .prettyPrint(true);
 
-    @Nonnull
+    @NonNull
     private final Path pythonPackageDir;
 
-    private PythonFileGenerator(@Nonnull final Path pythonPackageDir) {
+    private PythonFileGenerator(@NonNull final Path pythonPackageDir) {
         this.pythonPackageDir = pythonPackageDir;
     }
 
-    @Nonnull
-    public static PythonFileGenerator usingPythonPackageDir(@Nonnull final Path pythonPackageDir) {
+    @NonNull
+    public static PythonFileGenerator usingPythonPackageDir(@NonNull final Path pythonPackageDir) {
         return new PythonFileGenerator(pythonPackageDir);
     }
 
-    @Nonnull @Override
+    @NonNull @Override
     public Table<GeneratedFileType, GeneratedFilePath, GeneratedFile> generateFiles(
-            @Nonnull final EffectiveModelContext yangContext,
-            @Nonnull final Set<Module> yangModules,
-            @Nonnull final ModuleResourceResolver ignoredModuleResourcePathResolver)
+            @NonNull final EffectiveModelContext yangContext,
+            @NonNull final Set<Module> yangModules,
+            @NonNull final ModuleResourceResolver ignoredModuleResourcePathResolver)
 
             throws FileGeneratorException {
 
-        for (@Nonnull final var yangModule : yangModules) {
-            for (@Nonnull final var dataSchemaNode : yangModule.getChildNodes()) {
+        for (@NonNull final var yangModule : yangModules) {
+            for (@NonNull final var dataSchemaNode : yangModule.getChildNodes()) {
                 if (dataSchemaNode instanceof ContainerSchemaNode containerSchemaNode) {
-                    this.generatePychonClassPackage(this.pythonPackageDir, containerSchemaNode);
+                    this.generatePythonClassPackage(this.pythonPackageDir, containerSchemaNode, yangContext);
                 }
             }
         }
@@ -69,19 +72,27 @@ public class PythonFileGenerator implements FileGenerator {
         return HashBasedTable.create();
     }
 
-    @Nonnull
+    @NonNull
     protected <C extends DataNodeContainer & DataSchemaNode>
-    void generatePychonClassPackage(@Nonnull final Path parentPackageDir, @Nonnull final C yangContainer)
+    void generatePythonClassPackage(
+            @NonNull final Path parentPackageDir,
+            @NonNull final C yangContainer,
+            @NonNull final EffectiveModelContext yangContext)
+
             throws FileGeneratorException {
 
-        @Nonnull final var yangQName = yangContainer.getQName();
-        @Nonnull final var yangContainerName = new YangName(yangQName.getLocalName());
+        @NonNull final var yangContainerModule = yangContainer.getQName().getModule();
 
-        @Nonnull final var containerMembersContext = new HashSet<Map<String, Object>>();
-        @Nonnull final var listMembersContext = new HashSet<Map<String, Object>>();
+        @NonNull final var yangContainerName = new YangName(yangContainer.getQName());
+        @NonNull final var yangContainerPrefix = yangContext.findModule(yangContainerModule).map(Module::getName)
+                .orElseThrow(() -> new RuntimeException(String.format("Missing module %s in %s", yangContainerModule,
+                        yangContext)));
 
+        @NonNull final var leafMembersContext = new HashSet<Map<String, Object>>();
+        @NonNull final var containerMembersContext = new HashSet<Map<String, Object>>();
+        @NonNull final var listMembersContext = new HashSet<Map<String, Object>>();
 
-        @Nonnull final var packageDir = parentPackageDir.resolve(yangContainerName.toPythonName());
+        @NonNull final var packageDir = parentPackageDir.resolve(yangContainerName.toPythonName());
         try {
             Files.createDirectories(packageDir);
 
@@ -89,50 +100,57 @@ public class PythonFileGenerator implements FileGenerator {
             throw new FileGeneratorException(String.format("Failed creating directory %s", packageDir.toAbsolutePath()));
         }
 
-        @Nonnull final var pythonFile = packageDir.resolve("__init__.py").toFile();
+        @NonNull final var pythonFile = packageDir.resolve("__init__.py").toFile();
 
-        for (@Nonnull final var dataSchemaNode : yangContainer.getChildNodes()) {
-            if (dataSchemaNode instanceof ContainerSchemaNode containerMemberSchemaNode) {
-                @Nonnull final var containerMemberName = new YangName(containerMemberSchemaNode.getQName().getLocalName());
+        for (@NonNull final var dataSchemaNode : yangContainer.getChildNodes()) {
+            @NonNull final var memberModule = dataSchemaNode.getQName().getModule();
 
-                containerMembersContext.add(Map.of(
-                        "yangName", containerMemberName,
-                        "pythonName", containerMemberName.toPythonName(),
-                        "className", containerMemberName.toPythonClassName()));
+            @NonNull final var memberName = new YangName(dataSchemaNode.getQName());
+            @NonNull final var memberPrefix = yangContext.findModule(memberModule).map(Module::getName).orElseThrow(() ->
+                    new RuntimeException(String.format("Missing module %s in %s", memberModule, yangContext)));
 
-                this.generatePychonClassPackage(packageDir, containerMemberSchemaNode);
+            @NonNull final var memberContext = Map.of(
+                    "yangName", memberName,
+                    "yangNamespace", memberName.getNamespace(),
+                    "yangModule", memberPrefix,
+                    "pythonName", memberName.toPythonName());
+
+            if (dataSchemaNode instanceof LeafSchemaNode leafMemberSchemaNode) {
+                leafMembersContext.add(memberContext);
+
+            } else if (dataSchemaNode instanceof ContainerSchemaNode containerMemberSchemaNode) {
+                containerMembersContext.add(EntryStream.of(memberContext).append(
+                        "className", memberName.toPythonClassName()).toMap());
+
+                this.generatePythonClassPackage(packageDir, containerMemberSchemaNode, yangContext);
 
             } else if (dataSchemaNode instanceof ListSchemaNode listMemberSchemaNode) {
-                @Nonnull final var listMemberName = new YangName(listMemberSchemaNode.getQName().getLocalName());
+                listMembersContext.add(EntryStream.of(memberContext).append(
+                        "className", memberName.toPythonClassName()).toMap());
 
-                listMembersContext.add(Map.of(
-                        "yangName", listMemberName,
-                        "pythonName", listMemberName.toPythonName(),
-                        "className", listMemberName.toPythonClassName()));
-
-                this.generatePychonClassPackage(packageDir, listMemberSchemaNode);
+                this.generatePythonClassPackage(packageDir, listMemberSchemaNode, yangContext);
             }
         }
 
-        try {
-            @Nonnull final var pythonFileWriter = new FileWriter(pythonFile);
+        try (@NonNull final var pythonFileWriter = new FileWriter(pythonFile)) {
+
             HANDLEBARS.compile("class.py").apply(Map.of(
                     "yangName", yangContainerName,
+                    "yangNamespace", yangContainerName.getNamespace(),
+                    "yangModule", yangContainerPrefix,
+
                     "pythonName", yangContainerName.toPythonName(),
                     "className", yangContainerName.toPythonClassName(),
 
+                    "leafMembers", leafMembersContext,
                     "containerMembers", containerMembersContext,
                     "listMembers", listMembersContext
 
-            ), pythonFileWriter);;
-
-            pythonFileWriter.close();
+            ), pythonFileWriter);
 
         } catch (final IOException e) {
             throw new FileGeneratorException(String.format("Failed creating %s from template class.py.hbs",
-                    pythonFile.getAbsolutePath()
-
-            ), e);
+                    pythonFile.getAbsolutePath()), e);
         }
     }
 }
