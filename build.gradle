@@ -28,6 +28,7 @@ repositories {
 }
 
 dependencies {
+    gradleApi()
     localGroovy()
 
     implementation 'commons-io:commons-io:2.11.0'
@@ -38,5 +39,8 @@ dependencies {
     implementation 'org.opendaylight.mdsal:mdsal-binding-java-api-generator:8.0.15'
     implementation 'org.opendaylight.mdsal:mdsal-binding-runtime-spi:8.0.15'
 
-    testImplementation 'org.spockframework:spock-core:2.1-M4-groovy-3.0'
+    annotationProcessor 'org.projectlombok:lombok:1.18.24'
+    compileOnly 'org.projectlombok:lombok:1.18.24'
+
+    testImplementation 'org.spockframework:spock-core:2.2-groovy-3.0'
 }
