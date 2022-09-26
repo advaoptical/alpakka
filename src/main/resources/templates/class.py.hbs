@@ -79,7 +79,10 @@ class {{{className}}}Meta(type):
                 return
 
             data = instance._json
-            if (key := f'{self.yang_module_name}:{self.yang_name}') in data:
+            if ((key :=
+                    ':'.join((self._yang_module_name, self._yang_name)))
+                    in data):
+
                 data[key] = value
             else:
                 data[self._yang_name] = value
@@ -250,28 +253,33 @@ class {{{className}}}(metaclass={{{className}}}Meta):
 
     {{#each leafMembers}}
     {{{this.pythonName}}} = {{{../className}}}Meta.YANGLeafMember(
-        '{{{this.yangName}}}', '{{{this.yangNamespace}}}',
+        '{{{this.yangName}}}',
+        '{{{this.yangNamespace}}}',
         '{{{this.yangModule}}}')
 
     _yang_leaf_members.append({{{this.pythonName}}})
+
     {{/each}}
     {{#each containerMembers}}
     {{{this.pythonName}}} = {{{../className}}}Meta.YANGContainerMember(
         {{{../className}}}Meta.{{{this.className}}},
-        '{{{this.yangName}}}', '{{{this.yangNamespace}}}',
+        '{{{this.yangName}}}',
+        '{{{this.yangNamespace}}}',
         '{{{this.yangModule}}}')
 
     _yang_container_members.append({{{this.pythonName}}})
+
     {{/each}}
     {{#each listMembers}}
     {{{this.pythonName}}} = {{{../className}}}Meta.YANGListMember(
         {{{../className}}}Meta.{{{this.className}}},
-        '{{{this.yangName}}}', '{{{this.yangNamespace}}}',
+        '{{{this.yangName}}}',
+        '{{{this.yangNamespace}}}',
         '{{{this.yangModule}}}')
 
     _yang_list_members.append({{{this.pythonName}}})
-    {{/each}}
 
+    {{/each}}
     def to_json(self, yang_parent_module_name=None):
 
         def child_items():
@@ -291,7 +299,7 @@ class {{{className}}}(metaclass={{{className}}}Meta):
 
         if (yang_module_name := self.yang_module_name) != (
                 yang_parent_module_name):
-            key = f'{yang_module_name}:{self.yang_name}'
+            key = ':'.join((yang_module_name, self.yang_name))
         else:
             key = self.yang_name
 
