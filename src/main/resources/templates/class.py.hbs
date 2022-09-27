@@ -217,10 +217,6 @@ class {{{className}}}Meta(type):
 class {{{className}}}(metaclass={{{className}}}Meta):
     """REST/YANG/JSON container handler class."""
 
-    _yang_leaf_members: List[{{{className}}}Meta.YANGLeafMember] = []
-    _yang_container_members: List[{{{className}}}Meta.YANGContainerMember] = []
-    _yang_list_members: List[{{{className}}}Meta.YANGListMember] = []
-
     _json: Dict[str, Any] = None
 
     def __init__(self, json_data: Union[AnyStr, Dict[str, Any]]):
@@ -251,35 +247,38 @@ class {{{className}}}(metaclass={{{className}}}Meta):
     def yang_module_name(self) -> str:
         return '{{{yangModule}}}'
 
+    _yang_leaf_members: List[{{{className}}}Meta.YANGLeafMember] = [
     {{#each leafMembers}}
-    {{{this.pythonName}}} = {{{../className}}}Meta.YANGLeafMember(
-        '{{{this.yangName}}}',
-        '{{{this.yangNamespace}}}',
-        '{{{this.yangModule}}}')
 
-    _yang_leaf_members.append({{{this.pythonName}}})
-
+        ({{{this.pythonName}}} := {{{../className}}}Meta.YANGLeafMember(
+            '{{{this.yangName}}}',
+            '{{{this.yangNamespace}}}',
+            '{{{this.yangModule}}}')),
     {{/each}}
+    ]
+
+    _yang_container_members: List[{{{className}}}Meta.YANGContainerMember] = [
     {{#each containerMembers}}
-    {{{this.pythonName}}} = {{{../className}}}Meta.YANGContainerMember(
-        {{{../className}}}Meta.{{{this.className}}},
-        '{{{this.yangName}}}',
-        '{{{this.yangNamespace}}}',
-        '{{{this.yangModule}}}')
 
-    _yang_container_members.append({{{this.pythonName}}})
-
+        ({{{this.pythonName}}} := {{{../className}}}Meta.YANGContainerMember(
+            {{{../className}}}Meta.{{{this.className}}},
+            '{{{this.yangName}}}',
+            '{{{this.yangNamespace}}}',
+            '{{{this.yangModule}}}')),
     {{/each}}
+    ]
+
+    _yang_list_members: List[{{{className}}}Meta.YANGListMember] = [
     {{#each listMembers}}
-    {{{this.pythonName}}} = {{{../className}}}Meta.YANGListMember(
-        {{{../className}}}Meta.{{{this.className}}},
-        '{{{this.yangName}}}',
-        '{{{this.yangNamespace}}}',
-        '{{{this.yangModule}}}')
 
-    _yang_list_members.append({{{this.pythonName}}})
-
+        ({{{this.pythonName}}} := {{{../className}}}Meta.YANGListMember(
+            {{{../className}}}Meta.{{{this.className}}},
+            '{{{this.yangName}}}',
+            '{{{this.yangNamespace}}}',
+            '{{{this.yangModule}}}')),
     {{/each}}
+    ]
+
     def to_json(self, yang_parent_module_name=None):
 
         def child_items():
