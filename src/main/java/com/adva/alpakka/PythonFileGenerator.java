@@ -12,11 +12,12 @@ import lombok.NonNull;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
-import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
+import one.util.streamex.EntryStream;
+import one.util.streamex.StreamEx;
 
 import com.github.jknack.handlebars.Handlebars;
 import com.github.jknack.handlebars.helper.StringHelpers;
-import one.util.streamex.EntryStream;
+import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
 
 import org.opendaylight.yangtools.plugin.generator.api.FileGenerator;
 import org.opendaylight.yangtools.plugin.generator.api.FileGeneratorException;
@@ -24,6 +25,8 @@ import org.opendaylight.yangtools.plugin.generator.api.GeneratedFile;
 import org.opendaylight.yangtools.plugin.generator.api.GeneratedFilePath;
 import org.opendaylight.yangtools.plugin.generator.api.GeneratedFileType;
 import org.opendaylight.yangtools.plugin.generator.api.ModuleResourceResolver;
+
+import org.opendaylight.yangtools.yang.common.QName;
 
 import org.opendaylight.yangtools.yang.model.api.ContainerSchemaNode;
 import org.opendaylight.yangtools.yang.model.api.DataNodeContainer;
@@ -132,21 +135,25 @@ public class PythonFileGenerator implements FileGenerator {
             }
         }
 
+        @NonNull final Map<String, Object> templateContext = EntryStream.of(
+                "yangName", yangContainerName,
+                "yangNamespace", yangContainerName.getNamespace(),
+                "yangModule", yangContainerPrefix,
+
+                "pythonName", yangContainerName.toPythonName(),
+                "className", yangContainerName.toPythonClassName(),
+
+                "leafMembers", leafMembersContext,
+                "containerMembers", containerMembersContext,
+                "listMembers", listMembersContext).toMap();
+
+        if (yangContainer instanceof ListSchemaNode yangList) {
+            templateContext.put("yangListKeyNames", StreamEx.of(yangList.getKeyDefinition()).map(QName::getLocalName)
+                        .toImmutableList());
+        }
+
         try (@NonNull final var pythonFileWriter = new FileWriter(pythonFile)) {
-
-            HANDLEBARS.compile("class.py").apply(Map.of(
-                    "yangName", yangContainerName,
-                    "yangNamespace", yangContainerName.getNamespace(),
-                    "yangModule", yangContainerPrefix,
-
-                    "pythonName", yangContainerName.toPythonName(),
-                    "className", yangContainerName.toPythonClassName(),
-
-                    "leafMembers", leafMembersContext,
-                    "containerMembers", containerMembersContext,
-                    "listMembers", listMembersContext
-
-            ), pythonFileWriter);
+            HANDLEBARS.compile("class.py").apply(templateContext, pythonFileWriter);
 
         } catch (final IOException e) {
             throw new FileGeneratorException(String.format("Failed creating %s from template class.py.hbs",
