@@ -1,0 +1,380 @@
+import json
+from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
+
+
+class YANGMember:
+
+    _yang_name: str = None
+    _yang_namespace: str = None
+    _yang_module_name: str = None
+
+    def __init__(
+            self, yang_name: str, yang_namespace: str,
+            yang_module_name: str):
+
+        self._yang_name = yang_name
+        self._yang_namespace = yang_namespace
+        self._yang_module_name = yang_module_name
+
+    @property
+    def yang_name(self) -> str:
+        return self._yang_name
+
+    @property
+    def yang_namespace(self) -> str:
+        return self._yang_namespace
+
+    @property
+    def yang_module_name(self) -> str:
+        return self._yang_module_name
+
+
+class YANGLeafMember(YANGMember):
+
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+
+        yang_name = self._yang_name
+        yang_member = self
+
+        class ChildLeaf:
+
+            @property
+            def value(self):
+                data = instance._data
+                if (key := yang_name) in data:
+                    return data[key]
+
+                return data.get(':'.join((
+                    yang_member._yang_module_name, yang_name)))
+
+            def __call__(self):
+                return self.value
+
+            @property
+            def yang_name(self) -> str:
+                return yang_member._yang_name
+
+            @property
+            def yang_namespace(self) -> str:
+                return yang_member._yang_namespace
+
+            @property
+            def yang_module_name(self) -> str:
+                return yang_member._yang_module_name
+
+            def __repr__(self):
+                return (
+                    f"<{owner.__qualname__}.{type(self).__name__}: " +
+                    f"{yang_member._yang_module_name}" +
+                    f":{yang_member.yang_name}>")
+
+        return ChildLeaf()
+
+    def __set__(self, instance, value):
+        if instance is None:
+            return
+
+        data = instance._data
+        if ((key := ':'.join((self._yang_module_name, self._yang_name)))
+                in data):
+
+            data[key] = value
+        else:
+            data[self._yang_name] = value
+
+
+class YANGContainerMember(YANGMember):
+
+    _yang_container_type: type = None
+
+    def __init__(
+            self, yang_container_type: type,
+            yang_name: str, yang_namespace: str, yang_module_name: str):
+
+        super().__init__(yang_name, yang_namespace, yang_module_name)
+        self._yang_container_type = yang_container_type
+
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+
+        yang_container_type = self._yang_container_type
+        yang_name = self._yang_name
+        yang_member = self
+
+        class ChildContainer:
+
+            @property
+            def value(self) -> yang_container_type:
+                data = instance._data
+
+                if (key :=':'.join((
+                        yang_member._yang_module_name, yang_name))) in data:
+
+                    child_data = data[key]
+                else:
+                    child_data = data.setdefault(yang_name, {})
+
+                return yang_container_type({yang_name: child_data})
+
+            def __call__(self) -> yang_container_type:
+                return self.value
+
+            @property
+            def yang_name(self) -> str:
+                return yang_member._yang_name
+
+            @property
+            def yang_namespace(self) -> str:
+                return yang_member._yang_namespace
+
+            @property
+            def yang_module_name(self) -> str:
+                return yang_member._yang_module_name
+
+            def to_json(self, yang_parent_module_name: str=None):
+                return self.value.to_json(
+                    yang_parent_module_name=yang_parent_module_name)
+
+        return ChildContainer()
+
+
+class YANGListMember(YANGMember):
+
+    _yang_list_type: type = None
+
+    def __init__(
+            self, yang_list_type: type,
+            yang_name: str, yang_namespace: str, yang_module_name: str):
+
+        super().__init__(yang_name, yang_namespace, yang_module_name)
+        self._yang_list_type = yang_list_type
+
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+
+        yang_list_type = self._yang_list_type
+        yang_name = self._yang_name
+        yang_member = self
+
+        class ChildList:
+
+            @staticmethod
+            def _child_data_list():
+                data = instance._data
+                if (key := ':'.join((
+                        yang_member._yang_module_name, yang_name))) in data:
+
+                    return data[key]
+
+                return data.setdefault(yang_name, [])
+
+            @property
+            def value(self) -> List[yang_list_type]:
+                return [
+                    yang_list_type({yang_name: [child_data]})
+                    for child_data in self._child_data_list()]
+
+            def __call__(self) -> List[yang_list_type]:
+                return self.value
+
+            def __getitem__(self, key) -> yang_list_type:
+                child_data_list = self._child_data_list()
+                child = yang_list_type(
+                    {yang_member._yang_name: child_data_list},
+                    json_data_list_key=key)
+
+                if not id(child_data := child._data) in map(
+                        id, child_data_list):
+                    child_data_list.append(child_data)
+                return child
+
+            @property
+            def yang_name(self) -> str:
+                return yang_member._yang_name
+
+            @property
+            def yang_namespace(self) -> str:
+                return yang_member._yang_namespace
+
+            @property
+            def yang_module_name(self) -> str:
+                return yang_member._yang_module_name
+
+            def to_json(self, yang_parent_module_name=None):
+                json_data = {}
+                for child in self.value:
+                    for yang_name, child_data_list in (child.to_json(
+                            yang_parent_module_name=(
+                            yang_parent_module_name))).items():
+
+                        json_data.setdefault(yang_name, []).extend(
+                            child_data_list)
+
+                return json_data
+
+        return ChildList()
+
+
+class YANGContainer:
+    """REST/YANG/JSON container handler class."""
+
+    _yang_name: str = None
+    _yang_namespace: str = None
+    _yang_module_name: str = None
+
+    _data: Dict[str, Any] = None
+
+    _yang_leaf_members: Dict[ str, YANGLeafMember] = None
+    _yang_container_members: Dict[str, YANGContainerMember] = None
+    _yang_list_members: Dict[str, YANGListMember] = None
+
+    def __init__(
+            self, json_data: Optional[Union[AnyStr, Dict[str, Any]]]=None):
+
+        if json_data is None:
+            self._data = {}
+            return
+
+        if isinstance(json_data, bytes):
+            json_data = json_data.decode('utf8')
+
+        if isinstance(json_data, str):
+            json_data = json.loads(json_data)
+
+        if (key := ':'.join((
+                self._yang_module_name, self._yang_name))) not in json_data:
+            key = self._yang_name
+
+        data = json_data.get(key, {})
+        if not isinstance(data, dict):
+            raise TypeError(f"{key!r} should be a dict, not: {type(data)}")
+
+        self._data = data
+
+    @property
+    def yang_name(self) -> str:
+        return self._yang_name
+
+    @property
+    def yang_namespace(self) -> str:
+        return self._yang_namespace
+
+    @property
+    def yang_module_name(self) -> str:
+        return self._yang_module_name
+
+    def to_json(self, yang_parent_module_name=None) -> Dict[str, Any]:
+
+        def child_items():
+            for yang_name, yang_member in self._yang_leaf_members.items():
+                if (value := yang_member.__get__(self).value) is not None:
+
+                    if (yang_child_module_name :=
+                            yang_member.yang_module_name) != (
+                                    self._yang_module_name):
+
+                        child_key = ':'.join((
+                            yang_child_module_name, yang_name))
+                    else:
+                        child_key = yang_name
+
+                    yield child_key, value
+
+            for yang_name, yang_member in (
+                    self._yang_container_members.items()):
+
+                if yang_name in self._data or ':'.join((
+                        yang_member._yang_namespace,
+                        yang_name)) in self._data:
+
+                    yield from yang_member.__get__(self).to_json(
+                        yang_parent_module_name=(
+                            self._yang_module_name)).items()
+
+            for yang_name, yang_member in self._yang_list_members.items():
+                if yang_name in self._data or ':'.join((
+                        yang_member._yang_namespace,
+                        yang_name)) in self._data:
+
+                    yield from yang_member.__get__(self).to_json(
+                        yang_parent_module_name=(
+                            self._yang_module_name)).items()
+
+        if (yang_module_name := self._yang_module_name) != (
+                yang_parent_module_name):
+            key = ':'.join((yang_module_name, self._yang_name))
+        else:
+            key = self._yang_name
+
+        return {key: dict(child_items())}
+
+
+class YANGListItem(YANGContainer):
+    """REST/YANG/JSON list item handler class."""
+
+    _yang_list_key_names: Tuple[str] = None
+
+    def __init__(
+            self, json_data: Optional[Union[AnyStr, Dict[str, Any]]]=None,
+            json_data_list_key=None):
+
+        if json_data is None:
+            raise ValueError(f"{self._yang_name!r} list needs input data")
+
+        if isinstance(json_data, bytes):
+            json_data = json_data.decode('utf8')
+
+        if isinstance(json_data, str):
+            json_data = json.loads(json_data)
+
+        if (key := ':'.join((
+                self._yang_module_name, self._yang_name))) not in json_data:
+            key = self._yang_name
+
+        data_list = json_data.get(key, [])
+        if not isinstance(data_list, list):
+            raise TypeError(
+                f"{key!r} should be a list, not: {type(data_list)}")
+
+        if not json_data_list_key:
+            if len(data_list) == 1:
+                data = data_list[0]
+            else:
+                raise ValueError(f"{key!r} list key is missing")
+
+        else:
+            if not isinstance(json_data_list_key, tuple):
+                json_data_list_key = (json_data_list_key, )
+
+            for data in json_data.get(key, []):
+                if tuple(
+                        data.get(yang_name) for yang_name
+                        in self._yang_list_key_names) == json_data_list_key:
+
+                    break
+            else:
+                data = {key: value for key, value in zip(
+                    self._yang_list_key_names, json_data_list_key)}
+
+        if not isinstance(data, dict):
+            raise TypeError(
+                f"{key!r} list item should be a dict, not: {type(data)}")
+
+        self._data = data
+
+    def yang_key(self):
+        if len(self._yang_list_key_names) == 1:
+            return self._yang_leaf_members[
+                self._yang_list_key_names[0]].__get__(self).value
+
+        return tuple(
+            self._yang_leaf_members[yang_name].__get__(self).value
+            for yang_name in self._yang_list_key_names)
+
+    def to_json(self, yang_parent_module_name=None) -> Dict[str, list]:
+        return {key: [data] for key, data in super().to_json(
+            yang_parent_module_name=yang_parent_module_name).items()}
