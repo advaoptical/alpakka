@@ -64,6 +64,23 @@ public class PythonFileGenerator implements FileGenerator {
 
             throws FileGeneratorException {
 
+        try {
+            Files.createDirectories(this.pythonPackageDir);
+
+        } catch (IOException ex) {
+            throw new FileGeneratorException(String.format("Failed creating directory %s",
+                    this.pythonPackageDir.toAbsolutePath()));
+        }
+
+        @NonNull final var pythonFile = this.pythonPackageDir.resolve("__init__.py").toFile();
+        try (@NonNull final var pythonFileWriter = new FileWriter(pythonFile)) {
+            HANDLEBARS.compile("root.py").apply(Map.of(), pythonFileWriter);
+
+        } catch (final IOException e) {
+            throw new FileGeneratorException(String.format("Failed creating %s from template root.py.hbs",
+                    pythonFile.getAbsolutePath()), e);
+        }
+
         for (@NonNull final var yangModule : yangModules) {
             for (@NonNull final var dataSchemaNode : yangModule.getChildNodes()) {
                 if (dataSchemaNode instanceof ContainerSchemaNode containerSchemaNode) {
