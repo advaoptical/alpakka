@@ -1,5 +1,5 @@
 import json
-from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
+from typing import Any, AnyStr, Dict, List, Optional, Tuple, Type, Union
 
 
 class YANGMember:
@@ -378,3 +378,18 @@ class YANGListItem(YANGContainer):
     def to_json(self, yang_parent_module_name=None) -> Dict[str, list]:
         return {key: [data] for key, data in super().to_json(
             yang_parent_module_name=yang_parent_module_name).items()}
+
+
+def load_json_data(
+        json_data: Union[AnyStr, Dict[str, Any]],
+        *yang_types: Tuple[Type[YANGContainer]]) -> List[YANGContainer]:
+
+    if isinstance(json_data, bytes):
+        json_data = json_data.decode('utf8')
+
+    if isinstance(json_data, str):
+        json_data = json.loads(json_data)
+
+    json_data = json_data.get('data', json_data)
+
+    return [yang_type(json_data) for yang_type in yang_types]
