@@ -50,7 +50,7 @@ class {{{className}}}(
     _yang_container_members: Dict[str, YANGContainerMember] = {
 {{#each containerMembers}}
 
-        '{{{this.pythonName}}}': (
+        '{{{this.yangName}}}': (
             {{{this.pythonName}}} := YANGContainerMember(
                 {{{../className}}}Meta.{{{this.className}}},
                 '{{{this.yangName}}}',
