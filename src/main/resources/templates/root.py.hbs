@@ -40,17 +40,13 @@ class YANGLeafMember(YANGMember):
 
         class ChildLeaf:
 
-            @property
-            def value(self):
+            def __call__(self):
                 data = instance._data
                 if (key := yang_name) in data:
                     return data[key]
 
                 return data.get(':'.join((
                     yang_member._yang_module_name, yang_name)))
-
-            def __call__(self):
-                return self.value
 
             @property
             def yang_name(self) -> str:
@@ -89,11 +85,12 @@ class YANGContainerMember(YANGMember):
 
     _yang_container_type: type = None
 
-    def __init__(
-            self, yang_container_type: type,
-            yang_name: str, yang_namespace: str, yang_module_name: str):
+    def __init__(self, yang_container_type: type):
+        super().__init__(
+            yang_container_type._yang_name,
+            yang_container_type._yang_namespace,
+            yang_container_type._yang_module_name)
 
-        super().__init__(yang_name, yang_namespace, yang_module_name)
         self._yang_container_type = yang_container_type
 
     def __get__(self, instance, owner=None):
@@ -106,11 +103,10 @@ class YANGContainerMember(YANGMember):
 
         class ChildContainer:
 
-            @property
-            def value(self) -> yang_container_type:
+            def __call__(self) -> yang_container_type:
                 data = instance._data
 
-                if (key :=':'.join((
+                if (key := ':'.join((
                         yang_member._yang_module_name, yang_name))) in data:
 
                     child_data = data[key]
@@ -118,9 +114,6 @@ class YANGContainerMember(YANGMember):
                     child_data = data.setdefault(yang_name, {})
 
                 return yang_container_type({yang_name: child_data})
-
-            def __call__(self) -> yang_container_type:
-                return self.value
 
             @property
             def yang_name(self) -> str:
@@ -135,7 +128,7 @@ class YANGContainerMember(YANGMember):
                 return yang_member._yang_module_name
 
             def to_json(self, yang_parent_module_name: str=None):
-                return self.value.to_json(
+                return self().to_json(
                     yang_parent_module_name=yang_parent_module_name)
 
         return ChildContainer()
@@ -143,20 +136,21 @@ class YANGContainerMember(YANGMember):
 
 class YANGListMember(YANGMember):
 
-    _yang_list_type: type = None
+    _yang_list_item_type: type = None
 
-    def __init__(
-            self, yang_list_type: type,
-            yang_name: str, yang_namespace: str, yang_module_name: str):
+    def __init__(self, yang_list_item_type: type):
+        super().__init__(
+            yang_list_item_type._yang_name,
+            yang_list_item_type._yang_namespace,
+            yang_list_item_type._yang_module_name)
 
-        super().__init__(yang_name, yang_namespace, yang_module_name)
-        self._yang_list_type = yang_list_type
+        self._yang_list_item_type = yang_list_item_type
 
     def __get__(self, instance, owner=None):
         if instance is None:
             return self
 
-        yang_list_type = self._yang_list_type
+        yang_list_item_type = self._yang_list_item_type
         yang_name = self._yang_name
         yang_member = self
 
@@ -172,18 +166,14 @@ class YANGListMember(YANGMember):
 
                 return data.setdefault(yang_name, [])
 
-            @property
-            def value(self) -> List[yang_list_type]:
+            def __call__(self) -> List[yang_list_item_type]:
                 return [
-                    yang_list_type({yang_name: [child_data]})
+                    yang_list_item_type({yang_name: [child_data]})
                     for child_data in self._child_data_list()]
 
-            def __call__(self) -> List[yang_list_type]:
-                return self.value
-
-            def __getitem__(self, key) -> yang_list_type:
+            def __getitem__(self, key) -> yang_list_item_type:
                 child_data_list = self._child_data_list()
-                child = yang_list_type(
+                child = yang_list_item_type(
                     {yang_member._yang_name: child_data_list},
                     json_data_list_key=key)
 
@@ -206,12 +196,12 @@ class YANGListMember(YANGMember):
 
             def to_json(self, yang_parent_module_name=None):
                 json_data = {}
-                for child in self.value:
-                    for yang_name, child_data_list in (child.to_json(
+                for child in self():
+                    for child_name, child_data_list in (child.to_json(
                             yang_parent_module_name=(
                             yang_parent_module_name))).items():
 
-                        json_data.setdefault(yang_name, []).extend(
+                        json_data.setdefault(child_name, []).extend(
                             child_data_list)
 
                 return json_data
@@ -220,7 +210,7 @@ class YANGListMember(YANGMember):
 
 
 class YANGContainer:
-    """REST/YANG/JSON container handler class."""
+    """Base class for YANG container handlers."""
 
     _yang_name: str = None
     _yang_namespace: str = None
@@ -228,9 +218,11 @@ class YANGContainer:
 
     _data: Dict[str, Any] = None
 
-    _yang_leaf_members: Dict[ str, YANGLeafMember] = None
+    _yang_leaf_members: Dict[str, YANGLeafMember] = None
     _yang_container_members: Dict[str, YANGContainerMember] = None
     _yang_list_members: Dict[str, YANGListMember] = None
+
+    _yang_choices: Dict[str, YANGMember] = None
 
     def __init__(
             self, json_data: Optional[Union[AnyStr, Dict[str, Any]]]=None):
@@ -271,7 +263,7 @@ class YANGContainer:
 
         def child_items():
             for yang_name, yang_member in self._yang_leaf_members.items():
-                if (value := yang_member.__get__(self).value) is not None:
+                if (value := yang_member.__get__(self)()) is not None:
 
                     if (yang_child_module_name :=
                             yang_member.yang_module_name) != (
@@ -304,6 +296,14 @@ class YANGContainer:
                         yang_parent_module_name=(
                             self._yang_module_name)).items()
 
+            for yang_choice in self._yang_choices.values():
+                if (yang_case_container :=
+                        yang_choice._yang_case_container) is not None:
+
+                    yield from next(iter(yang_case_container.to_json(
+                        yang_parent_module_name=(
+                            self._yang_module_name)).values())).items()
+
         if (yang_module_name := self._yang_module_name) != (
                 yang_parent_module_name):
             key = ':'.join((yang_module_name, self._yang_name))
@@ -314,7 +314,7 @@ class YANGContainer:
 
 
 class YANGListItem(YANGContainer):
-    """REST/YANG/JSON list item handler class."""
+    """Base class for YANG list item handlers."""
 
     _yang_list_key_names: Tuple[str] = None
 
@@ -340,7 +340,7 @@ class YANGListItem(YANGContainer):
             raise TypeError(
                 f"{key!r} should be a list, not: {type(data_list)}")
 
-        if not json_data_list_key:
+        if json_data_list_key is None:
             if len(data_list) == 1:
                 data = data_list[0]
             else:
@@ -369,15 +369,69 @@ class YANGListItem(YANGContainer):
     def yang_key(self):
         if len(self._yang_list_key_names) == 1:
             return self._yang_leaf_members[
-                self._yang_list_key_names[0]].__get__(self).value
+                self._yang_list_key_names[0]].__get__(self)()
 
         return tuple(
-            self._yang_leaf_members[yang_name].__get__(self).value
+            self._yang_leaf_members[yang_name].__get__(self)()
             for yang_name in self._yang_list_key_names)
 
     def to_json(self, yang_parent_module_name=None) -> Dict[str, list]:
         return {key: [data] for key, data in super().to_json(
             yang_parent_module_name=yang_parent_module_name).items()}
+
+
+class YANGChoiceCase:
+    """Base class for YANG choice case handlers."""
+
+    _yang_name: str = None
+
+    _yang_container_type: Type[YANGContainer] = None
+
+    _yang_container: YANGContainer = None
+
+    def __init__(self, yang_container_type: Type[YANGContainer]):
+        self._yang_container_type = yang_container_type
+        self._yang_name = yang_container_type._yang_name
+
+    @property
+    def yang_name(self) -> str:
+        return self._yang_name
+
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+
+        yang_case_container_type = self._yang_container_type
+        yang_name = self._yang_name
+        yang_choice_case = self
+
+        class Case:
+            def __call__(
+                    self,
+                    json_data: Optional[Union[AnyStr, Dict[str, Any]]]=None):
+
+                yang_container = yang_choice_case._yang_container = (
+                    yang_case_container_type(json_data))
+                return yang_container
+
+        return Case()
+
+
+class YANGChoice(YANGMember):
+    """Base class for YANG choice handlers."""
+
+    _yang_parent: YANGContainer = None
+
+    _yang_cases: Dict[str, YANGChoiceCase] = None
+
+    def __init__(self, yang_parent: YANGContainer):
+        self._yang_parent = yang_parent
+
+    @property
+    def _yang_case_container(self) -> YANGContainer:
+        for yang_case in self._yang_cases.values():
+            if (yang_container := yang_case._yang_container) is not None:
+                return yang_container
 
 
 def load_json_data(

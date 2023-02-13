@@ -28,6 +28,7 @@ import org.opendaylight.yangtools.plugin.generator.api.ModuleResourceResolver;
 
 import org.opendaylight.yangtools.yang.common.QName;
 
+import org.opendaylight.yangtools.yang.model.api.ChoiceSchemaNode;
 import org.opendaylight.yangtools.yang.model.api.ContainerSchemaNode;
 import org.opendaylight.yangtools.yang.model.api.DataNodeContainer;
 import org.opendaylight.yangtools.yang.model.api.DataSchemaNode;
@@ -111,6 +112,7 @@ public class PythonFileGenerator implements FileGenerator {
         @NonNull final var leafMembersContext = new HashSet<Map<String, Object>>();
         @NonNull final var containerMembersContext = new HashSet<Map<String, Object>>();
         @NonNull final var listMembersContext = new HashSet<Map<String, Object>>();
+        @NonNull final var choiceMembersContext = new HashSet<Map<String, Object>>();
 
         @NonNull final var packageDir = parentPackageDir.resolve(yangContainerName.toPythonName());
         try {
@@ -135,7 +137,7 @@ public class PythonFileGenerator implements FileGenerator {
                     "yangModule", memberPrefix,
                     "pythonName", memberName.toPythonName());
 
-            if (dataSchemaNode instanceof LeafSchemaNode leafMemberSchemaNode) {
+            if (dataSchemaNode instanceof LeafSchemaNode) {
                 leafMembersContext.add(memberContext);
 
             } else if (dataSchemaNode instanceof ContainerSchemaNode containerMemberSchemaNode) {
@@ -149,6 +151,17 @@ public class PythonFileGenerator implements FileGenerator {
                         "className", memberName.toPythonClassName()).toMap());
 
                 this.generatePythonClassPackage(packageDir, listMemberSchemaNode, yangContext);
+
+            } else if (dataSchemaNode instanceof ChoiceSchemaNode choiceMemberSchemaNode) {
+                @NonNull final var caseSchemaNodes = choiceMemberSchemaNode.getCases();
+
+                choiceMembersContext.add(EntryStream.of(memberContext).append(
+                        "className", memberName.toPythonClassName(),
+                        "caseClassNames", StreamEx.of(caseSchemaNodes)
+                                .map(node -> new YangName(node.getQName()).toPythonClassName())
+                                .toImmutableList()).toMap());
+
+                this.generatePythonChoicePackage(packageDir, choiceMemberSchemaNode, yangContext);
             }
         }
 
@@ -162,7 +175,8 @@ public class PythonFileGenerator implements FileGenerator {
 
                 "leafMembers", leafMembersContext,
                 "containerMembers", containerMembersContext,
-                "listMembers", listMembersContext).toMap();
+                "listMembers", listMembersContext,
+                "choiceMembers", choiceMembersContext).toMap();
 
         if (yangContainer instanceof ListSchemaNode yangList) {
             templateContext.put("yangListKeyNames", StreamEx.of(yangList.getKeyDefinition()).map(QName::getLocalName)
@@ -174,6 +188,63 @@ public class PythonFileGenerator implements FileGenerator {
 
         } catch (final IOException e) {
             throw new FileGeneratorException(String.format("Failed creating %s from template class.py.hbs",
+                    pythonFile.getAbsolutePath()), e);
+        }
+    }
+
+    @NonNull
+    protected void generatePythonChoicePackage(
+            @NonNull final Path parentPackageDir,
+            @NonNull final ChoiceSchemaNode yangChoice,
+            @NonNull final EffectiveModelContext yangContext)
+
+            throws FileGeneratorException {
+
+        @NonNull final var yangChoiceModule = yangChoice.getQName().getModule();
+
+        @NonNull final var yangChoiceName = new YangName(yangChoice.getQName());
+        @NonNull final var yangChoicePrefix = yangContext.findModule(yangChoiceModule).map(Module::getName)
+                .orElseThrow(() -> new RuntimeException(String.format("Missing module %s in %s", yangChoiceModule,
+                        yangContext)));
+
+        @NonNull final var casesContext = new HashSet<Map<String, Object>>();
+
+        @NonNull final var packageDir = parentPackageDir.resolve(yangChoiceName.toPythonName());
+        try {
+            Files.createDirectories(packageDir);
+
+        } catch (IOException ex) {
+            throw new FileGeneratorException(String.format("Failed creating directory %s", packageDir.toAbsolutePath()));
+        }
+
+        @NonNull final var pythonFile = packageDir.resolve("__init__.py").toFile();
+
+        for (@NonNull final var caseSchemaNode : yangChoice.getCases()) {
+            @NonNull final var caseName = new YangName(caseSchemaNode.getQName());
+
+            casesContext.add(Map.of(
+                    "yangName", caseName,
+                    "pythonName", caseName.toPythonName(),
+                    "className", caseName.toPythonClassName()));
+
+            this.generatePythonClassPackage(packageDir, caseSchemaNode, yangContext);
+        }
+
+        @NonNull final Map<String, Object> templateContext = EntryStream.of(
+                "yangName", yangChoiceName,
+                "yangNamespace", yangChoiceName.getNamespace(),
+                "yangModule", yangChoicePrefix,
+
+                "pythonName", yangChoiceName.toPythonName(),
+                "className", yangChoiceName.toPythonClassName(),
+
+                "cases", casesContext).toMap();
+
+        try (@NonNull final var pythonFileWriter = new FileWriter(pythonFile)) {
+            HANDLEBARS.compile("choice.py").apply(templateContext, pythonFileWriter);
+
+        } catch (final IOException e) {
+            throw new FileGeneratorException(String.format("Failed creating %s from template choice.py.hbs",
                     pythonFile.getAbsolutePath()), e);
         }
     }

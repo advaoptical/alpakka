@@ -1,0 +1,38 @@
+from typing import Dict, Final
+
+from .. import (
+    YANGChoice, YANGChoiceCase, YANGContainer, YANGContainerMember,
+    YANGLeafMember, YANGListItem, YANGListMember)
+
+
+class {{{className}}}Meta(type):
+    """
+    Metaclass for YANG choice handler.
+
+    YANG name: {{{yangName}}}
+    """
+
+{{#each cases}}
+    from .{{{this.pythonName}}} import {{{this.className}}}
+{{/each}}
+
+
+class {{{className}}}(YANGChoice, metaclass={{{className}}}Meta):
+    """
+    YANG choice handler.
+
+    YANG name: {{{yangName}}}
+    """
+
+    _yang_name: Final[str] = '{{{yangName}}}'
+    _yang_namespace: Final[str] = '{{{yangNamespace}}}'
+    _yang_module_name: Final[str] = '{{{yangModule}}}'
+
+    _yang_cases: Final[Dict[str, YANGChoiceCase]] = {
+{{#each cases}}
+
+        '{{{this.yangName}}}': (
+            {{{this.pythonName}}} := YANGChoiceCase(
+                {{{../className}}}Meta.{{{this.className}}})),
+{{/each}}
+    }
