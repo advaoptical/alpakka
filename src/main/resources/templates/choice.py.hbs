@@ -15,6 +15,27 @@ class {{{className}}}Meta(type):
 {{#each cases}}
     from .{{{this.pythonName}}} import {{{this.className}}}
 {{/each}}
+{{#each cases}}
+
+    class {{{this.pythonName}}}_case_descriptor(YANGChoiceCase):
+        """
+        YANG choice case descriptor class.
+
+        YANG name: {{{yangName}}}
+        """
+
+        def __init__(self):
+            super().__init__(
+                {{{../className}}}Meta.{{{this.className}}})
+
+        def __get__(self, instance, owner=None) -> (
+                '{{{../className}}}Meta.{{{this.pythonName}}}_case_descriptor'):
+            return super().__get__(instance, owner)
+
+        def __call__(self) -> (
+                '{{{../className}}}Meta.{{{this.className}}}'):
+            pass
+{{/each}}
 
 
 class {{{className}}}(YANGChoice, metaclass={{{className}}}Meta):
@@ -32,7 +53,8 @@ class {{{className}}}(YANGChoice, metaclass={{{className}}}Meta):
 {{#each cases}}
 
         '{{{this.yangName}}}': (
-            {{{this.pythonName}}} := YANGChoiceCase(
-                {{{../className}}}Meta.{{{this.className}}})),
+            {{{this.pythonName}}} := (  # YANGChoiceCase(
+                {{{../className}}}Meta.
+                {{{this.pythonName}}}_case_descriptor())),
 {{/each}}
     }

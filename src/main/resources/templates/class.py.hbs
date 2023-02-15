@@ -1,4 +1,4 @@
-from typing import Dict, Final{{#if yangListKeyNames}}, Tuple{{/if}}
+from typing import Dict, Final{{#if yangListKeyNames}}, List, Tuple{{/if}}
 
 from .. import (
     YANGChoice, YANGChoiceCase, YANGContainer, YANGContainerMember,
@@ -21,13 +21,32 @@ class {{{className}}}Meta(type):
     from .{{{this.pythonName}}} import {{{this.className}}}
 {{/each}}
 
+    class yang_{{#if yangListKeyNames}}list{{else}}container{{/if}}_descriptor(
+            YANG{{#if yangListKeyNames}}List{{else}}Container{{/if}}Member):
+        """
+        YANG {{#if yangListKeyNames}}list{{else}}container{{/if}} descriptor class.
+
+        YANG name: {{{yangName}}}
+        """
+
+        def __init__(self):
+            super().__init__({{{className}}})
+
+        def __get__(self, instance, owner=None) -> (
+                '{{{className}}}Meta.yang_{{#if yangListKeyNames}}list{{else}}container{{/if}}_descriptor'):
+            return super().__get__(instance, owner)
+
+        def __call__(self) -> {{#if yangListKeyNames}}List['{{{className}}}']{{else}}'{{{className}}}'{{/if}}:
+            pass
+{{#if yangListKeyNames}}
+
+        def __getitem__(self, key) -> '{{{className}}}':
+            return super()[key]
+{{/if}}
+
 
 class {{{className}}}(
-{{#if yangListKeyNames}}
-        YANGListItem,
-{{else}}
-        YANGContainer,
-{{/if}}
+        YANG{{#if yangListKeyNames}}ListItem{{else}}Container{{/if}},
         metaclass={{{className}}}Meta):
     """
     YANG {{#if yangListKeyNames}}list item{{else}}container{{/if}} handler.
@@ -62,8 +81,10 @@ class {{{className}}}(
 {{#each containerMembers}}
 
         '{{{this.yangName}}}': (
-            {{{this.pythonName}}} := YANGContainerMember(
-                {{{../className}}}Meta.{{{this.className}}})),
+            {{{this.pythonName}}} := (  # YANGContainerMember(
+                {{{../className}}}Meta.
+                {{{this.className}}}.
+                yang_container_descriptor())),
 {{/each}}
     }
 
@@ -71,14 +92,16 @@ class {{{className}}}(
 {{#each listMembers}}
 
         '{{{this.yangName}}}': (
-            {{{this.pythonName}}} := YANGListMember(
-                {{{../className}}}Meta.{{{this.className}}})),
+            {{{this.pythonName}}} := (  # YANGListMember(
+                {{{../className}}}Meta.
+                {{{this.className}}}.
+                yang_list_descriptor())),
 {{/each}}
     }
 
     _yang_choices: Final[Dict[str, YANGChoice]] = None
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs) -> '{{{className}}}':
         instance = super().__new__(cls)
         instance._yang_choices = {
 {{#each choiceMembers}}
@@ -92,6 +115,7 @@ class {{{className}}}(
 {{#each choiceMembers}}
 
     @property
-    def {{{this.pythonName}}}(self):
+    def {{{this.pythonName}}}(self) -> (
+            {{{../className}}}Meta.{{{this.className}}}):
         return self._yang_choices['{{{this.yangName}}}']
 {{/each}}
