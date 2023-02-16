@@ -1,3 +1,4 @@
+from itertools import chain
 from typing import Any, AnyStr, Dict, List, Optional, Tuple, Type, Union
 import json
 
@@ -90,9 +91,9 @@ class YANGLeafMember(YANGMember):
 
 class YANGContainerMember(YANGMember):
 
-    _yang_container_type: type = None
+    _yang_container_type: Type['YANGContainer'] = None
 
-    def __init__(self, yang_container_type: type):
+    def __init__(self, yang_container_type: Type['YANGContainer']):
         super().__init__(
             yang_container_type._yang_name,
             yang_container_type._yang_namespace,
@@ -150,9 +151,9 @@ class YANGContainerMember(YANGMember):
 
 class YANGListMember(YANGMember):
 
-    _yang_list_item_type: type = None
+    _yang_list_item_type: Type['YANGListItem'] = None
 
-    def __init__(self, yang_list_item_type: type):
+    def __init__(self, yang_list_item_type: Type['YANGListItem']):
         super().__init__(
             yang_list_item_type._yang_name,
             yang_list_item_type._yang_namespace,
@@ -243,7 +244,7 @@ class YANGContainer:
     _yang_container_members: Dict[str, YANGContainerMember] = None
     _yang_list_members: Dict[str, YANGListMember] = None
 
-    _yang_choices: Dict[str, YANGMember] = None
+    _yang_choices: Dict[str, 'YANGChoice'] = None
 
     def __init__(
             self, json_data: Optional[Union[AnyStr, Dict[str, Any]]]=None):
@@ -265,6 +266,9 @@ class YANGContainer:
         data = json_data.get(key, {})
         if not isinstance(data, dict):
             raise TypeError(f"{key!r} should be a dict, not: {type(data)}")
+
+        for yang_choice in self._yang_choices.values():
+            yang_choice(data)
 
         self._data = data
 
@@ -385,6 +389,9 @@ class YANGListItem(YANGContainer):
             raise TypeError(
                 f"{key!r} list item should be a dict, not: {type(data)}")
 
+        for yang_choice in self._yang_choices.values():
+            yang_choice(data)
+
         self._data = data
 
     def yang_key(self):
@@ -427,13 +434,35 @@ class YANGChoiceCase:
         yang_choice_case = self
 
         class Case:
-            def __call__(
-                    self,
-                    json_data: Optional[Union[AnyStr, Dict[str, Any]]]=None):
 
-                yang_container = yang_choice_case._yang_container = (
-                    yang_case_container_type(json_data))
-                return yang_container
+            def __call__(self, data: Optional[Dict[str, Any]]=None):
+                if data:
+                    for yang_member in chain(
+                            yang_case_container_type.
+                            _yang_leaf_members.values(),
+
+                            yang_case_container_type.
+                            _yang_container_members.values(),
+
+                            yang_case_container_type.
+                            _yang_list_members.values()):
+
+                        if yang_member._yang_name in data or ':'.join((
+                                yang_member._yang_module_name,
+                                yang_member._yang_name)) in data:
+                            break
+                    else:
+                        data = None
+
+                if data:
+                    yang_choice_case._yang_container = (
+                        yang_case_container_type({yang_name: data}))
+
+                elif yang_choice_case._yang_container is None:
+                    yang_choice_case._yang_container = (
+                        yang_case_container_type())
+
+                return yang_choice_case._yang_container
 
             def __enter__(self):
                 return self()
@@ -455,16 +484,22 @@ class YANGChoice(YANGMember):
     def __init__(self, yang_parent: YANGContainer):
         self._yang_parent = yang_parent
 
+    def __call__(self, data: Dict[str, Any]):
+        for yang_case in self._yang_cases.values():
+            yang_case.__get__(self)(data)
+
     @property
     def _yang_case_container(self) -> YANGContainer:
         for yang_case in self._yang_cases.values():
-            if (yang_container := yang_case._yang_container) is not None:
+            if (yang_container :=
+                    yang_case._yang_container) is not None and (
+                            yang_container._data):
                 return yang_container
 
 
 def load_json_data(
         json_data: Union[AnyStr, Dict[str, Any]],
-        *yang_types: Tuple[Type[YANGContainer]]) -> List[YANGContainer]:
+        *yang_types: Type[YANGContainer]) -> List[YANGContainer]:
 
     if isinstance(json_data, bytes):
         json_data = json_data.decode('utf8')
