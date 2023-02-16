@@ -40,8 +40,16 @@ class {{{className}}}Meta(type):
             pass
 {{#if yangListKeyNames}}
 
+        def __enter__(self) -> (
+                '{{{className}}}Meta.yang_list_descriptor'):
+            pass
+
         def __getitem__(self, key) -> '{{{className}}}':
             return super()[key]
+{{else}}
+
+        def __enter__(self) -> '{{{className}}}':
+            pass
 {{/if}}
 
 

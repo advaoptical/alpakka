@@ -1,5 +1,5 @@
-import json
 from typing import Any, AnyStr, Dict, List, Optional, Tuple, Type, Union
+import json
 
 
 class YANGMember:
@@ -59,6 +59,13 @@ class YANGLeafMember(YANGMember):
             @property
             def yang_module_name(self) -> str:
                 return yang_member._yang_module_name
+
+            def __enter__(self):
+                return self()
+
+            def __exit__(self, exc_type, exc, traceback):
+                if exc is not None:
+                    raise exc
 
             def __repr__(self):
                 return (
@@ -127,6 +134,13 @@ class YANGContainerMember(YANGMember):
             def yang_module_name(self) -> str:
                 return yang_member._yang_module_name
 
+            def __enter__(self):
+                return self()
+
+            def __exit__(self, exc_type, exc, traceback):
+                if exc is not None:
+                    raise exc
+
             def to_json(self, yang_parent_module_name: str=None):
                 return self().to_json(
                     yang_parent_module_name=yang_parent_module_name)
@@ -193,6 +207,13 @@ class YANGListMember(YANGMember):
             @property
             def yang_module_name(self) -> str:
                 return yang_member._yang_module_name
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                if exc is not None:
+                    raise exc
 
             def to_json(self, yang_parent_module_name=None):
                 json_data = {}
@@ -413,6 +434,13 @@ class YANGChoiceCase:
                 yang_container = yang_choice_case._yang_container = (
                     yang_case_container_type(json_data))
                 return yang_container
+
+            def __enter__(self):
+                return self()
+
+            def __exit__(self, exc_type, exc, traceback):
+                if exc is not None:
+                    raise exc
 
         return Case()
 
