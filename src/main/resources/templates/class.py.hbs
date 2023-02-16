@@ -1,4 +1,4 @@
-from typing import Dict, Final{{#if yangListKeyNames}}, List, Tuple{{/if}}
+from typing import Dict, Final{{#if yangListKeyNames}}, Iterator, List, Tuple{{/if}}
 
 from .. import (
     YANGChoice, YANGChoiceCase, YANGContainer, YANGContainerMember,
@@ -40,12 +40,15 @@ class {{{className}}}Meta(type):
             pass
 {{#if yangListKeyNames}}
 
-        def __enter__(self) -> (
-                '{{{className}}}Meta.yang_list_descriptor'):
-            pass
+        def __iter__(self, key) -> Iterator['{{{className}}}']:
+            return super().__iter__()
 
         def __getitem__(self, key) -> '{{{className}}}':
             return super()[key]
+
+        def __enter__(self) -> (
+                '{{{className}}}Meta.yang_list_descriptor'):
+            pass
 {{else}}
 
         def __enter__(self) -> '{{{className}}}':
