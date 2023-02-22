@@ -178,7 +178,6 @@ class YANGListMember(YANGMember):
                 data = instance._data
                 if (key := ':'.join((
                         yang_member._yang_module_name, yang_name))) in data:
-
                     return data[key]
 
                 return data.setdefault(yang_name, [])
@@ -189,6 +188,9 @@ class YANGListMember(YANGMember):
             def __iter__(self) -> Iterator[yang_list_item_type]:
                 for child_data in self._child_data_list():
                     yield yang_list_item_type({yang_name: [child_data]})
+
+            def __len__(self):
+                return len(self._child_data_list())
 
             def __getitem__(self, key) -> yang_list_item_type:
                 child_data_list = self._child_data_list()
@@ -229,7 +231,6 @@ class YANGListMember(YANGMember):
 
                         json_data.setdefault(child_name, []).extend(
                             child_data_list)
-
                 return json_data
 
         return ChildList()
