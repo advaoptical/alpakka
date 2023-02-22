@@ -4,6 +4,15 @@ from typing import (
 
 import json
 
+from pkg_resources import require
+
+from lxml.etree import _Element, Element, QName, SubElement
+
+
+__requires__ = ("lxml >= 4.9.1", )
+
+require(__requires__)
+
 
 class YANGMember:
 
@@ -144,9 +153,18 @@ class YANGContainerMember(YANGMember):
                 if exc is not None:
                     raise exc
 
-            def to_json(self, yang_parent_module_name: str=None):
+            def to_json(self, yang_parent_module_name: str=None) -> (
+                    Dict[str, Dict[str, Any]]):
                 return self().to_json(
                     yang_parent_module_name=yang_parent_module_name)
+
+            def to_xml(
+                    self, parent_element: _Element=None,
+                    parent_namespace: str=None) -> _Element:
+
+                return self().to_xml(
+                    parent_element=parent_element,
+                    parent_namespace=parent_namespace)
 
         return ChildContainer()
 
@@ -222,7 +240,9 @@ class YANGListMember(YANGMember):
                 if exc is not None:
                     raise exc
 
-            def to_json(self, yang_parent_module_name=None):
+            def to_json(self, yang_parent_module_name=None) -> (
+                    Dict[str, List[Dict[str, Any]]]):
+
                 json_data = {}
                 for child in self():
                     for child_name, child_data_list in (child.to_json(
@@ -232,6 +252,14 @@ class YANGListMember(YANGMember):
                         json_data.setdefault(child_name, []).extend(
                             child_data_list)
                 return json_data
+
+            def to_xml(
+                    self, parent_element: _Element=None,
+                    parent_namespace: str=None) -> List[_Element]:
+
+                return [child.to_xml(
+                    parent_element=parent_element,
+                    parent_namespace=parent_namespace) for child in self]
 
         return ChildList()
 
@@ -289,7 +317,8 @@ class YANGContainer:
     def yang_module_name(self) -> str:
         return self._yang_module_name
 
-    def to_json(self, yang_parent_module_name=None) -> Dict[str, Any]:
+    def to_json(self, yang_parent_module_name=None) -> (
+            Dict[str, Dict[str, Any]]):
 
         def child_items():
             for yang_name, yang_member in self._yang_leaf_members.items():
@@ -341,6 +370,53 @@ class YANGContainer:
             key = self._yang_name
 
         return {key: dict(child_items())}
+
+    def to_xml(self, parent_element=None, parent_namespace=None) -> (
+            _Element):
+
+        nsmap = (namespace := self._yang_namespace) != (
+            parent_namespace) and {None: namespace} or None
+
+        element: _Element = Element(QName(
+            namespace, self._yang_name), None, nsmap) if (
+                parent_element is None) else (
+                    SubElement(parent_element, QName(
+                        namespace, self._yang_name), None, nsmap))
+
+        for yang_name, yang_member in self._yang_leaf_members.items():
+            if (value := yang_member.__get__(self)()) is not None:
+
+                child_nsmap = (
+                    child_namespace := yang_member.yang_namespace) != (
+                        namespace) and {None: namespace} or None
+
+                child_element: _Element = SubElement(element, QName(
+                    child_namespace, yang_name), None, child_nsmap)
+                child_element.text = str(value)
+
+        for yang_name, yang_member in self._yang_container_members.items():
+            if yang_name in self._data or ':'.join((
+                    yang_member._yang_namespace, yang_name)) in self._data:
+
+                yang_member.__get__(self).to_xml(
+                    parent_element=element, parent_namespace=namespace)
+
+        for yang_name, yang_member in self._yang_list_members.items():
+            if yang_name in self._data or ':'.join((
+                    yang_member._yang_namespace, yang_name)) in self._data:
+
+                yang_member.__get__(self).to_xml(
+                    parent_element=element, parent_namespace=namespace)
+
+        for yang_choice in self._yang_choices.values():
+            if (yang_case_container :=
+                    yang_choice._yang_case_container) is not None:
+
+                for child_element in yang_case_container.to_xml(
+                        parent_namespace=namespace).iterchildren():
+                    element.append(child_element)
+
+        return element
 
 
 class YANGListItem(YANGContainer):
@@ -408,7 +484,8 @@ class YANGListItem(YANGContainer):
             self._yang_leaf_members[yang_name].__get__(self)()
             for yang_name in self._yang_list_key_names)
 
-    def to_json(self, yang_parent_module_name=None) -> Dict[str, list]:
+    def to_json(self, yang_parent_module_name=None) -> (
+            Dict[str, List[Dict[str, Any]]]):
         return {key: [data] for key, data in super().to_json(
             yang_parent_module_name=yang_parent_module_name).items()}
 
