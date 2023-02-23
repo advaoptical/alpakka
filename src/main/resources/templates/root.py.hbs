@@ -300,10 +300,9 @@ class YANGContainer:
         if not isinstance(data, dict):
             raise TypeError(f"{key!r} should be a dict, not: {type(data)}")
 
+        self._data = data
         for yang_choice in self._yang_choices.values():
             yang_choice(data)
-
-        self._data = data
 
     @property
     def yang_name(self) -> str:
@@ -356,9 +355,7 @@ class YANGContainer:
                             self._yang_module_name)).items()
 
             for yang_choice in self._yang_choices.values():
-                if (yang_case_container :=
-                        yang_choice._yang_case_container) is not None:
-
+                if (yang_case_container := yang_choice()) is not None:
                     yield from next(iter(yang_case_container.to_json(
                         yang_parent_module_name=(
                             self._yang_module_name)).values())).items()
@@ -409,9 +406,7 @@ class YANGContainer:
                     parent_element=element, parent_namespace=namespace)
 
         for yang_choice in self._yang_choices.values():
-            if (yang_case_container :=
-                    yang_choice._yang_case_container) is not None:
-
+            if (yang_case_container := yang_choice()) is not None:
                 for child_element in yang_case_container.to_xml(
                         parent_namespace=namespace).iterchildren():
                     element.append(child_element)
@@ -470,10 +465,9 @@ class YANGListItem(YANGContainer):
             raise TypeError(
                 f"{key!r} list item should be a dict, not: {type(data)}")
 
+        self._data = data
         for yang_choice in self._yang_choices.values():
             yang_choice(data)
-
-        self._data = data
 
     def yang_key(self):
         if len(self._yang_list_key_names) == 1:
@@ -518,9 +512,7 @@ class YANGChoiceCase:
         class Case:
 
             def __bool__(self) -> bool:
-                return (yang_case_container :=
-                    yang_choice_case._yang_container) is not None and (
-                        bool(yang_case_container._data))
+                return bool(instance._data.get(yang_name))
 
             def __call__(self, data: Optional[Dict[str, Any]]=None):
                 if data:
@@ -542,14 +534,11 @@ class YANGChoiceCase:
                         data = None
 
                 if data:
-                    yang_choice_case._yang_container = (
-                        yang_case_container_type({yang_name: data}))
+                    instance._data[yang_name] = data
+                else:
+                    data = instance._data.setdefault(yang_name, {})
 
-                elif yang_choice_case._yang_container is None:
-                    yang_choice_case._yang_container = (
-                        yang_case_container_type())
-
-                return yang_choice_case._yang_container
+                return yang_case_container_type({yang_name: data})
 
             def __enter__(self):
                 return self()
@@ -568,12 +557,26 @@ class YANGChoice(YANGMember):
 
     _yang_cases: Dict[str, YANGChoiceCase] = None
 
+    @property
+    def _data(self) -> Dict[str, Dict[str, Any]]:
+        parent_data = self._yang_parent._data
+        if (key := ':'.join((
+                self._yang_module_name, self._yang_name))) in parent_data:
+
+            return parent_data[key]
+        else:
+            return parent_data.setdefault(self._yang_name, {})
+
     def __init__(self, yang_parent: YANGContainer):
         self._yang_parent = yang_parent
 
-    def __call__(self, data: Dict[str, Any]):
+    def __call__(self, parent_data: Optional[Dict[str, Any]]=None) -> (
+            Optional[str]):
+
         for yang_case in self._yang_cases.values():
-            yang_case.__get__(self)(data)
+            if (yang_case_container :=
+                    yang_case.__get__(self)(parent_data))._data:
+                return yang_case_container
 
     @property
     def _yang_case_container(self) -> YANGContainer:
