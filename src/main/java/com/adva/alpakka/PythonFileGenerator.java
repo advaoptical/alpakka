@@ -28,13 +28,7 @@ import org.opendaylight.yangtools.plugin.generator.api.ModuleResourceResolver;
 
 import org.opendaylight.yangtools.yang.common.QName;
 
-import org.opendaylight.yangtools.yang.model.api.ChoiceSchemaNode;
-import org.opendaylight.yangtools.yang.model.api.ContainerSchemaNode;
-import org.opendaylight.yangtools.yang.model.api.DataNodeContainer;
-import org.opendaylight.yangtools.yang.model.api.DataSchemaNode;
-import org.opendaylight.yangtools.yang.model.api.EffectiveModelContext;
-import org.opendaylight.yangtools.yang.model.api.LeafSchemaNode;
-import org.opendaylight.yangtools.yang.model.api.ListSchemaNode;
+import org.opendaylight.yangtools.yang.model.api.*;
 import org.opendaylight.yangtools.yang.model.api.Module;
 
 
@@ -110,6 +104,7 @@ public class PythonFileGenerator implements FileGenerator {
                         yangContext)));
 
         @NonNull final var leafMembersContext = new HashSet<Map<String, Object>>();
+        @NonNull final var leafListMembersContext = new HashSet<Map<String, Object>>();
         @NonNull final var containerMembersContext = new HashSet<Map<String, Object>>();
         @NonNull final var listMembersContext = new HashSet<Map<String, Object>>();
         @NonNull final var choiceMembersContext = new HashSet<Map<String, Object>>();
@@ -139,6 +134,9 @@ public class PythonFileGenerator implements FileGenerator {
 
             if (dataSchemaNode instanceof LeafSchemaNode) {
                 leafMembersContext.add(memberContext);
+
+            } else if (dataSchemaNode instanceof LeafListSchemaNode) {
+                leafListMembersContext.add(memberContext);
 
             } else if (dataSchemaNode instanceof ContainerSchemaNode containerMemberSchemaNode) {
                 containerMembersContext.add(EntryStream.of(memberContext).append(
@@ -174,6 +172,7 @@ public class PythonFileGenerator implements FileGenerator {
                 "className", yangContainerName.toPythonClassName(),
 
                 "leafMembers", leafMembersContext,
+                "leafListMembers", leafListMembersContext,
                 "containerMembers", containerMembersContext,
                 "listMembers", listMembersContext,
                 "choiceMembers", choiceMembersContext).toMap();
