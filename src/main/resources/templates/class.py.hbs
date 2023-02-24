@@ -2,7 +2,7 @@ from typing import Dict, Final{{#if yangListKeyNames}}, Iterator, List, Tuple{{/
 
 from .. import (
     YANGChoice, YANGChoiceCase, YANGContainer, YANGContainerMember,
-    YANGLeafMember, YANGListItem, YANGListMember)
+    YANGLeafMember, YANGLeafListMember, YANGListItem, YANGListMember)
 
 
 class {{{className}}}Meta(type):
@@ -79,6 +79,17 @@ class {{{className}}}(
 
     _yang_leaf_members: Final[Dict[str, YANGLeafMember]] = {
 {{#each leafMembers}}
+
+        '{{{this.yangName}}}': (
+            {{{this.pythonName}}} := YANGLeafMember(
+                '{{{this.yangName}}}',
+                '{{{this.yangNamespace}}}',
+                '{{{this.yangModule}}}')),
+{{/each}}
+    }
+
+    _yang_leaf_list_members: Final[Dict[str, YANGLeafListMember]] = {
+{{#each leafListMembers}}
 
         '{{{this.yangName}}}': (
             {{{this.pythonName}}} := YANGLeafMember(

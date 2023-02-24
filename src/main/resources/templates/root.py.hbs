@@ -1,6 +1,7 @@
 from itertools import chain
 from typing import (
-    Any, AnyStr, Dict, Iterator, List, Optional, Tuple, Type, Union)
+    Any, AnyStr, Dict, Iterable, Iterator, List, Optional, Tuple, Type,
+    Union)
 
 import json
 
@@ -103,6 +104,15 @@ class YANGLeafMember(YANGMember):
             data[key] = value
         else:
             data[self._yang_name] = value
+
+
+class YANGLeafListMember(YANGLeafMember):
+
+    def __set__(self, instance, values: Iterable):
+        if instance is None:
+            return
+
+        super().__set__(instance, list(values))
 
 
 class YANGContainerMember(YANGMember):
@@ -291,6 +301,7 @@ class YANGContainer:
     _data: Dict[str, Any] = None
 
     _yang_leaf_members: Dict[str, YANGLeafMember] = None
+    _yang_leaf_list_members: Dict[str, YANGLeafListMember] = None
     _yang_container_members: Dict[str, YANGContainerMember] = None
     _yang_list_members: Dict[str, YANGListMember] = None
 
@@ -352,6 +363,21 @@ class YANGContainer:
                     yield child_key, value
 
             for yang_name, yang_member in (
+                    self._yang_leaf_list_members.items()):
+                if (values := yang_member.__get__(self)()) is not None:
+
+                    if (yang_child_module_name :=
+                            yang_member.yang_module_name) != (
+                                    self._yang_module_name):
+
+                        child_key = ':'.join((
+                            yang_child_module_name, yang_name))
+                    else:
+                        child_key = yang_name
+
+                    yield child_key, list(values)
+
+            for yang_name, yang_member in (
                     self._yang_container_members.items()):
 
                 if yang_name in self._data or ':'.join((
@@ -408,6 +434,18 @@ class YANGContainer:
                 child_element: _Element = SubElement(element, QName(
                     child_namespace, yang_name), None, child_nsmap)
                 child_element.text = str(value)
+
+        for yang_name, yang_member in self._yang_leaf_list_members.items():
+            if (values := yang_member.__get__(self)()) is not None:
+
+                children_nsmap = (
+                    child_namespace := yang_member.yang_namespace) != (
+                        namespace) and {None: namespace} or None
+
+                for value in values:
+                    child_element: _Element = SubElement(element, QName(
+                        child_namespace, yang_name), None, children_nsmap)
+                    child_element.text = str(value)
 
         for yang_name, yang_member in self._yang_container_members.items():
             if yang_name in self._data or ':'.join((
