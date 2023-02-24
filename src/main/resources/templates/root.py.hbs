@@ -52,6 +52,11 @@ class YANGLeafMember(YANGMember):
 
         class ChildLeaf:
 
+            def __bool__(self) -> bool:
+                return yang_name in instance._data or ':'.join((
+                    yang_member._yang_module_name,
+                    yang_name)) in instance._data
+
             def __call__(self) -> Any:
                 data = instance._data
                 if (key := yang_name) in data:
@@ -121,6 +126,11 @@ class YANGContainerMember(YANGMember):
         yang_member = self
 
         class ChildContainer:
+
+            def __bool__(self) -> bool:
+                return yang_name in instance._data or ':'.join((
+                    yang_member._yang_module_name,
+                    yang_name)) in instance._data
 
             def __call__(self) -> yang_container_type:
                 data = instance._data
@@ -200,6 +210,11 @@ class YANGListMember(YANGMember):
                     return data[key]
 
                 return data.setdefault(yang_name, [])
+
+            def __bool__(self) -> bool:
+                return yang_name in instance._data or ':'.join((
+                    yang_member._yang_module_name,
+                    yang_name)) in instance._data
 
             def __call__(self) -> List[yang_list_item_type]:
                 return list(iter(self))
