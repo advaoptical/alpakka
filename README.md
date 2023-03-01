@@ -4,6 +4,18 @@
 
 [license]: http://www.apache.org/licenses/LICENSE-2.0
 
+**[INFO] This project is currently in a transitional process of reimplementation based on Java, using [OpenDaylight libraries](https://github.com/opendaylight)!**
+
+* To generate a Python API from a set of YANG modules, the following [Gradle](https://gradle.org) command can currently be used:
+
+  ```shell
+  gradle run --args="path/to/your/yang/modules path/to/your/pythonized/yang/package" --info --stacktrace
+  ```
+
+  * The latter path is implicitly created, and if already existing, all content is deleted prior to writing the newly generated Python/YANG API packages.
+
+**[INFO] The old Python implementation, using pyang, is in parallel still extant without any modifications!**
+
 [![Supported Python versions][pyversions]][python]
 [![PyPI package version][version]][pypi]
 
