@@ -1,4 +1,4 @@
-from typing import Dict, Final{{#if yangListKeyNames}}, Iterator, List, Tuple{{/if}}
+from typing import Dict, Final{{#if isList}}, Iterator, List, Tuple{{/if}}
 
 from .. import (
     YANGChoice, YANGChoiceCase, YANGContainer, YANGContainerMember,
@@ -7,7 +7,7 @@ from .. import (
 
 class {{{className}}}Meta(type):
     """
-    Metaclass for YANG {{#if yangListKeyNames}}list item{{else}}container{{/if}} handler.
+    Metaclass for YANG {{#if isList}}list item{{else}}container{{/if}} handler.
 
     YANG name: {{{yangName}}}
     """
@@ -21,10 +21,10 @@ class {{{className}}}Meta(type):
     from .{{{this.pythonName}}} import {{{this.className}}}
 {{/each}}
 
-    class yang_{{#if yangListKeyNames}}list{{else}}container{{/if}}_descriptor(
-            YANG{{#if yangListKeyNames}}List{{else}}Container{{/if}}Member):
+    class yang_{{#if isList}}list{{else}}container{{/if}}_descriptor(
+            YANG{{#if isList}}List{{else}}Container{{/if}}Member):
         """
-        YANG {{#if yangListKeyNames}}list{{else}}container{{/if}} descriptor class.
+        YANG {{#if isList}}list{{else}}container{{/if}} descriptor class.
 
         YANG name: {{{yangName}}}
         """
@@ -33,18 +33,18 @@ class {{{className}}}Meta(type):
             super().__init__({{{className}}})
 
         def __get__(self, instance, owner=None) -> (
-                '{{{className}}}Meta.yang_{{#if yangListKeyNames}}list{{else}}container{{/if}}_descriptor'):
+                '{{{className}}}Meta.yang_{{#if isList}}list{{else}}container{{/if}}_descriptor'):
             return super().__get__(instance, owner)
 
-        def __call__(self) -> {{#if yangListKeyNames}}List['{{{className}}}']{{else}}'{{{className}}}'{{/if}}:
+        def __call__(self) -> {{#if isList}}List['{{{className}}}']{{else}}'{{{className}}}'{{/if}}:
             pass
-{{#if yangListKeyNames}}
+{{#if isList}}
 
         def __iter__(self, key) -> Iterator['{{{className}}}']:
-            return super().__iter__()
+            pass
 
         def __getitem__(self, key) -> '{{{className}}}':
-            return super()[key]
+            pass
 
         def __enter__(self) -> (
                 '{{{className}}}Meta.yang_list_descriptor'):
@@ -57,10 +57,10 @@ class {{{className}}}Meta(type):
 
 
 class {{{className}}}(
-        YANG{{#if yangListKeyNames}}ListItem{{else}}Container{{/if}},
+        YANG{{#if isList}}ListItem{{else}}Container{{/if}},
         metaclass={{{className}}}Meta):
     """
-    YANG {{#if yangListKeyNames}}list item{{else}}container{{/if}} handler.
+    YANG {{#if isList}}list item{{else}}container{{/if}} handler.
 
     YANG name: {{{yangName}}}
     """
@@ -68,7 +68,7 @@ class {{{className}}}(
     _yang_name: Final[str] = '{{{yangName}}}'
     _yang_namespace: Final[str] = '{{{yangNamespace}}}'
     _yang_module_name: Final[str] = '{{{yangModule}}}'
-{{#if yangListKeyNames}}
+{{#if isList}}
 
     _yang_list_key_names: Final[Tuple[str]] = (
         {{#each yangListKeyNames}}
