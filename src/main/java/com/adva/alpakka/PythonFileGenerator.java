@@ -178,8 +178,9 @@ public class PythonFileGenerator implements FileGenerator {
                 "choiceMembers", choiceMembersContext).toMap();
 
         if (yangContainer instanceof ListSchemaNode yangList) {
-            templateContext.put("yangListKeyNames", StreamEx.of(yangList.getKeyDefinition()).map(QName::getLocalName)
-                        .toImmutableList());
+            templateContext.putAll(Map.of(
+                    "isList", true,
+                    "yangListKeyNames", StreamEx.of(yangList.getKeyDefinition()).map(QName::getLocalName).toImmutableList()));
         }
 
         try (@NonNull final var pythonFileWriter = new FileWriter(pythonFile)) {
